@@ -470,8 +470,8 @@ function suitSlug(s){
   }
   function imgPath(c){
     if (c.back) return IMG_BASE + "back" + EXT;
-    if (isPage(c)) return IMG_BASE + \`page \${c.pageIndex}\` + EXT; // ensure filenames match
-    return IMG_BASE + \`\${rankSlug(c.rank)} \${suitSlug(c.suit)}\` + EXT;
+    if (isPage(c)) return IMG_BASE + `page ${c.pageIndex}` + EXT;
+return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
   }
 
   // Prefs & save
