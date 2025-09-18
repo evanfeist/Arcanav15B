@@ -537,7 +537,7 @@
     });
     markDrawerState();
     const first = el.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
-    first?.focus();
+    if (first) first.focus();
   }
   function closeDrawer(el){
     el.classList.remove('open');
@@ -575,7 +575,7 @@
     connect(){
       if(this.connected||this.connecting) return;
       this.connecting=true;
-      try{this.ws?.close()}catch{}
+      try{ if (this.ws) this.ws.close() }catch{}
       const url=(location.protocol==='https:'?'wss':'ws')+'://arcana-signal.onrender.com';
       this.ws=new WebSocket(url);
       this.ws.onopen=()=>{
@@ -611,7 +611,7 @@
       function send(obj){ try{ Net.ws && Net.ws.readyState===1 && Net.ws.send(JSON.stringify(obj)) }catch{} }
       Net._sendRaw=send;
     },
-    disconnect(){ try{this.ws?.close()}catch{}; this.ws=null; this.connected=false; this.connecting=false; $('netStatus').textContent='Offline'; updateModeTag(); updateStartDisabled(); },
+    disconnect(){ try{ if (this.ws) this.ws.close() }catch{}; this.ws=null; this.connected=false; this.connecting=false; $('netStatus').textContent='Offline'; updateModeTag(); updateStartDisabled(); },
   };
   function sendSig(payload){ if(Net.ws && Net.ws.readyState===1){ Net._sendRaw({type:'signal', hostId:Net.hostId, payload}) } }
   function sendSync(toPid){
@@ -1015,7 +1015,7 @@
       const th=G.players[target].hand;
       if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('9: swapped one card.'); toast('<div>9 resolved: swapped one card</div>') }
       else log('9: defender had no cards.');
-      if(info?.give) G.players[target].hand.push(info.give);
+      if (info && info.give) G.players[target].hand.push(info.give);
       return endTurn();
     }
     if(kind==='ASIG'){
@@ -1085,7 +1085,7 @@
   function aiChooseGive(pid,nineId){
     const pool=G.players[pid].hand.filter(c=>c.id!==nineId).slice();
     const val=(c)=> isPage(c)?100 : c.rank==='A'?90 : c.rank==='K'?80 : c.rank==='Q'?75 : c.rank==='J'?70 : c.rank==='9'?60 : c.rank==='7'?55 : c.rank==='6'?50 : RVAL(c.rank);
-    if(Pref.ai==='expert'){ pool.sort((a,b)=>val(a)-val(b)); return pool[0]?.id }
+    if(Pref.ai==='expert'){ pool.sort((a,b)=>val(a)-val(b)); return pool[0] ? pool[0].id : undefined }
     pool.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return pool[0]?.id;
   }
   function aiWantsAce(pid){
@@ -1172,7 +1172,7 @@
         if(!use){ G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
         const roll=1+Math.floor(Math.random()*6);
         if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
-        else { spendNAces(1,1); G.players[1].score+=1; bumpScore(1); if(kind==='A9'&&info?.give) G.discard.push(info.give); log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`); G.aceQuery=null; return endTurn() }
+        else { spendNAces(1,1); G.players[1].score+=1; bumpScore(1); if (kind === 'A9' && info && info.give) G.discard.push(info.give); log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`); G.aceQuery=null; return endTurn() }
       }
     }
   }
