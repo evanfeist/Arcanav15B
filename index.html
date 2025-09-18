@@ -5,8 +5,6 @@
   <title>Arcana — Solo vs AI / Online (Mobile-First)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f16" />
-  <!-- Keep only the back preloaded to avoid warnings -->
-  <link rel="preload" as="image" href="cards/back.webp" />
 
   <style>
     :root{
@@ -447,7 +445,7 @@
   <!-- === GAME LOGIC + ONLINE SYNC === -->
   <script>
   const $ = (id)=>document.getElementById(id);
-  const SUITS=['\\u2660','\\u2665','\\u2666','\\u2663']; // ♠ ♥ ♦ ♣
+  const SUITS=['♠','♥','♦','♣']
   const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
   const RVAL=r=>({A:1,J:11,Q:12,K:13}[r]||parseInt(r,10));
   const isPage=c=>c.page===true;
@@ -457,23 +455,18 @@
   const IMG_BASE="cards/";
   const EXT=".webp";
 
-  function suitSlug(s){
-    return s==='\\u2665' ? 'hearts'
-         : s==='\\u2666' ? 'diamonds'
-         : s==='\\u2663' ? 'clubs'
-         :                'spades';
-  }
+function suitSlug(s){
+  return s==='♥' ? 'hearts'
+       : s==='♦' ? 'diamonds'
+       : s==='♣' ? 'clubs'
+       :          'spades';
+}
   function rankSlug(r){
     if (r==='A') return 'ace';
     if (r==='J') return 'j';
     if (r==='Q') return 'q';
     if (r==='K') return 'k';
     return r;
-  }
-  function suitGlyph(s){
-    if (s && s.length===1) return s;
-    const m=String(s||'').match(/u\\+?([0-9a-f]{4})/i);
-    return m ? String.fromCharCode(parseInt(m[1],16)) : (s||'');
   }
   function imgPath(c){
     if (c.back) return IMG_BASE + "back" + EXT;
@@ -720,7 +713,7 @@
       if(!isPage(c)){
         const chip=document.createElement('div');
         chip.className='rank';
-        chip.textContent = (c.rank != null ? c.rank : '') + suitGlyph(c.suit || '');
+        chip.textContent = (c.rank ?? '') + (c.suit ?? '');
         d.appendChild(chip);
       }
       if(t==='Page'){
@@ -844,10 +837,10 @@
   }
   function applySuitBonus(res,allow){
     if(!res.suit || !allow) return;
-    if(res.suit==='\\u2665'){ res.points+=3; res.suitBonus='HEARTS' }
-    if(res.suit==='\\u2663'){ res.suitBonus='CLUBS' }
-    if(res.suit==='\\u2666'){ res.suitBonus='DIAMONDS' }
-    if(res.suit==='\\u2660'){ res.suitBonus='SPADES' }
+    if(res.suit==='♥'){ res.points+=3; res.suitBonus='HEARTS' }
+if(res.suit==='♣'){ res.suitBonus='CLUBS' }
+if(res.suit==='♦'){ res.suitBonus='DIAMONDS' }
+if(res.suit==='♠'){ res.suitBonus='SPADES' }
   }
   function currentSelected(pid){
     const ids=[...G.selected]; return G.players[pid].hand.filter(c=>ids.includes(c.id));
@@ -997,7 +990,7 @@
         const c=discardFromHandById(pid,act.cardId);
         if(!c){ log('Invalid discard.'); return }
         G.players[pid].score+=1; bumpScore(pid);
-        log(\`\${pid===0?'P1':'P2'} discarded \${c ? (c.rank + suitGlyph(c.suit)) : '—'} for +1.\`);
+        log(`${pid===0?'P1':'P2'} discarded ${c ? (c.rank + (c.suit||'')) : '—'} for +1.`);
         if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
         G.selected.clear(); endTurn(); return;
       }
