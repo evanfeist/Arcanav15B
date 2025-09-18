@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Arcana — Solo vs AI / Online (Mobile-First)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f16" />
+  <!-- Keep only the back preloaded to avoid warnings -->
+  <link rel="preload" as="image" href="cards/back.webp" />
+
+  <style>
+    :root{
+      --bg:#0b0f16; --panel:#121a24; --panel-2:#0e1520; --ink:#dfe7f5;
+      --sub:#9fb3d9; --accent:#6cc4ff; --ok:#5bd39b; --bad:#ff6b7a; --warn:#ffb347;
+      --card:#151e2a; --card-h:#192337; --sel:#6cc4ff; --border:#263243;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --safe-bottom:env(safe-area-inset-bottom,0px);
+      --cardRatio:63/112;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:linear-gradient(180deg,#0a0f17,#0b111a 40%,#0a1018);
+      color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial
+    }
+
+    .wrap{display:grid;grid-template-columns:1fr;gap:12px;padding:10px 10px calc(88px + var(--safe-bottom));max-width:760px;margin:0 auto}
+    .col{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-height:120px}
+    header.sticky{position:sticky;top:0;background:var(--panel-2);border-bottom:1px solid var(--border);z-index:5}
+    header.bar{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:10px 12px}
+    h3{margin:0;font-weight:700;letter-spacing:.4px}
+    .pill{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--sub)}
+
+    .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px}
+    .kpi .tile{background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .tile h4{margin:0 0 4px 0;color:var(--sub);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+    .tile .v{font-size:22px;font-weight:700}
+
+    .hand{display:flex;flex-wrap:wrap;gap:10px;padding:12px}
+    .card{
+      width:var(--cardW, clamp(64px, 22vw, 92px));
+      aspect-ratio:var(--cardRatio);
+      border-radius:12px;
+      background-color:var(--card);
+      background-size:cover;background-position:center;background-repeat:no-repeat;
+      border:1px solid var(--border);
+      position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      touch-action:manipulation;transition:transform .18s ease, background .18s ease;
+    }
+    .card:active{transform:translateY(1px)}
+    .card:hover{background-color:var(--card-h)}
+    .back{background-color:transparent;border:1px solid #1f2a3b}
+    .card.selected{
+      outline:3px solid var(--sel);
+      outline-offset:2px;
+      box-shadow:0 0 0 3px var(--sel), 0 10px 24px rgba(108,196,255,.20);
+    }
+    .card:focus-visible{
+      outline:3px solid var(--sel);
+      outline-offset:2px;
+      box-shadow:0 0 0 3px var(--sel), 0 10px 24px rgba(108,196,255,.20);
+    }
+
+    .rank{
+      position:absolute;bottom:8px;left:10px;font-weight:800;font-size:14px;line-height:1;
+      padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.95);color:#000;
+      box-shadow:0 1px 0 rgba(0,0,0,.12);user-select:none;pointer-events:none
+    }
+    .tag{
+      position:absolute;bottom:8px;right:10px;font-size:10px;padding:2px 6px;border:1px solid var(--border);
+      border-radius:999px;color:var(--sub);background:#0e1622;user-select:none;pointer-events:none
+    }
+
+    .panel{padding:10px}
+    #log{max-height:280px;overflow:auto;padding:10px;background:#0c121c;border-top:1px solid var(--border)}
+    #log .line{opacity:.95}
+
+    .drawer{
+      position:fixed;left:0;right:0;bottom:0;max-height:75vh;background:var(--panel);
+      border-top:1px solid var(--border);transform:translateY(105%);transition:.28s ease;
+      display:flex;flex-direction:column;z-index:80;border-top-left-radius:16px;border-top-right-radius:16px;box-shadow:var(--shadow)
+    }
+    .drawer.open{transform:translateY(0)}
+    .drawer header{background:var(--panel-2)}
+    .drawer .body{padding:16px 12px;overflow:auto;padding-bottom:calc(12px + var(--safe-bottom))}
+    .drawer .panel{padding-bottom:calc(10px + var(--safe-bottom))}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+
+    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + 88px + var(--safe-bottom));display:flex;flex-direction:column;gap:8px;z-index:90}
+    .toast{background:#0f1826;border:1px solid var(--border);padding:10px 12px;border-radius:12px;min-width:260px;text-align:center;opacity:1;transition:opacity .25s ease}
+    .die{font-weight:800}
+
+    .log-collapser{display:flex;justify-content:flex-end;padding:8px;background:#0c121c;border-top:1px solid var(--border)}
+    .log-collapser button{padding:8px 10px;border-radius:999px}
+    .log.is-collapsed{max-height:0;padding:0;border-top:none}
+
+    .tabbar{
+      position:fixed;left:0;right:0;bottom:0;background:rgba(10,15,23,.9);
+      backdrop-filter:blur(10px);border-top:1px solid var(--border);
+      padding:10px 12px calc(12px + var(--safe-bottom));z-index:50;
+      transition:transform .25s ease, opacity .2s ease
+    }
+    .tabbar .tray{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+    .tabbar button{padding:12px 8px;border-radius:12px}
+    body.drawer-open .tabbar{transform:translateY(120%);opacity:0;pointer-events:none}
+
+    button{background:#162232;color:var(--ink);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .btn-accent{border-color:#2b5aa1;background:#153055}
+    .btn-warn{border-color:#7a4e14;background:#2a1b0a}
+    .btn-ok{border-color:#1f6a4b;background:#0f2b1f}
+    .btn-ghost{background:transparent}
+
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    .no-anim *, .no-anim .card, .no-anim .drawer, .no-anim .toast { transition: none !important }
+
+    @media (max-width: 899px){ .desktop-actions{ display:none } }
+    @media (min-width: 900px){
+      .wrap{grid-template-columns:280px 1fr 360px;max-width:1200px;padding:12px}
+      .tabbar{display:none}
+      .card{width:62px}
+      #toast{bottom:18px}
+      .drawer{left:auto;right:0;top:0;bottom:0;width:420px;max-height:none;border-radius:0;border-left:1px solid var(--border);border-top:none;transform:translateX(100%)}
+      .drawer.open{transform:translateX(0)}
+    }
+    @media (prefers-reduced-motion: reduce){
+      :root { scroll-behavior:auto }
+      .drawer, .card, .toast { transition:none !important }
+    }
+
+    @keyframes dealIn { from{transform:translateY(12px) scale(.92);opacity:0} to{transform:none;opacity:1} }
+    @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
+    @keyframes bump { 0%{transform:translateY(0)} 35%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
+    @keyframes toastIn { from{transform:translate(-50%,12px);opacity:0} to{transform:translate(-50%,0);opacity:1} }
+    @keyframes flash { from{background:#122033} to{background:transparent} }
+
+    .anim-deal { animation:dealIn .28s ease forwards }
+    .anim-pop { animation:pop .18s ease }
+    .anim-bump { animation:bump .22s ease }
+    .toast.anim-in { animation:toastIn .22s ease }
+    #log .line.anim-flash { animation:flash .6s ease }
+
+    /* iOS bottom padding guard */
+    @supports(padding:max(0px)) {
+      .tabbar { padding-bottom: max(12px, var(--safe-bottom)); }
+    }
+  </style>
+</head>
+<body>
+  <a class="sr-only" href="#main">Skip to content</a>
+
+  <div class="wrap" id="main">
+    <!-- Left column -->
+    <div class="col" id="leftCol">
+      <header class="sticky bar">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="btnSettings" title="Settings" class="btn-ghost" aria-label="Open settings">⚙️</button>
+          <h3>Arcana — Solo / Online</h3>
+        </div>
+        <span class="pill" id="turnTag" aria-live="polite">—</span>
+      </header>
+
+      <div class="kpi" role="region" aria-label="Scoreboard">
+        <div class="tile"><h4>You</h4><div class="v" id="scoreYou">0</div></div>
+        <div class="tile"><h4>Opponent</h4><div class="v" id="scoreAI">0</div></div>
+        <div class="tile"><h4>Deck</h4><div class="v" id="deckTag">—</div></div>
+        <div class="tile"><h4>Discard</h4><div class="v" id="discardTag">—</div></div>
+      </div>
+
+      <div class="panel desktop-actions">
+        <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button id="btnStart" class="btn-ok">▶️ Start</button>
+          <button id="btnRules" class="btn-accent" aria-controls="rulesDrawer">📜 Rules</button>
+          <button id="btnConstruct">🧩 Construct</button>
+          <button id="btnAction">🎯 Action (6/7/9)</button>
+          <button id="btnSigil">✨ Sigil (J/Q/K)</button>
+          <button id="btnDiscard" class="btn-warn">🗑️ Discard (+1)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle column: hands -->
+    <div class="col" aria-label="Hands">
+      <header class="sticky bar">
+        <h3>Your Hand</h3>
+        <span class="pill"><span id="youCount">0</span> cards</span>
+      </header>
+      <div id="yourHand" class="hand" aria-live="polite"></div>
+
+      <header class="bar">
+        <h3>Opponent Hand</h3>
+        <span class="pill"><span id="aiCount">0</span> cards</span>
+      </header>
+      <div id="aiHand" class="hand"></div>
+    </div>
+
+    <!-- Right column: Log -->
+    <div class="col">
+      <header class="sticky bar">
+        <h3>Activity</h3>
+        <span class="pill" id="modeTag">—</span>
+      </header>
+      <div class="log-collapser"><button id="toggleLog" aria-expanded="true">Hide activity</button></div>
+      <div id="log" class="log" role="log" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Tabbar (mobile only) -->
+  <nav class="tabbar" aria-label="Arcana actions">
+    <div class="tray">
+      <button id="mbStart" class="btn-ok" aria-label="Start New">▶️ Start</button>
+      <button id="mbConstruct" aria-label="Play Construct">🧩 Construct</button>
+      <button id="mbAction" aria-label="Play Action">🎯 Action</button>
+      <button id="mbSigil" aria-label="Play Sigil">✨ Sigil</button>
+      <button id="mbDiscard" class="btn-warn" aria-label="Discard">🗑️ Discard</button>
+      <button id="mbRules" class="btn-accent" aria-label="Rules">📜 Rules</button>
+    </div>
+  </nav>
+
+  <!-- Drawers / Sheets -->
+  <div class="drawer" id="giveDrawer" aria-label="Choose a card to give" aria-hidden="true">
+    <header class="bar"><h3 style="margin:0">Swap — Choose one card to give</h3></header>
+    <div class="body"><div id="giveGrid" class="grid"></div></div>
+    <div class="panel" style="display:flex;justify-content:flex-end;gap:8px">
+      <button id="giveCancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="drawer" id="payDrawer" aria-label="Pay Page cost" aria-hidden="true">
+    <header class="bar"><h3 style="margin:0">Pay Page Cost</h3></header>
+    <div class="body">
+      <p id="payHint" style="margin-top:0;color:var(--sub)"></p>
+      <div id="payGrid" class="grid"></div>
+    </div>
+    <div class="panel" style="display:flex;justify-content:flex-end;gap:8px">
+      <button id="payCancel">Cancel</button>
+      <button id="payConfirm" class="btn-ok" disabled>Pay & Play</button>
+    </div>
+  </div>
+
+  <div class="drawer" id="aceDrawer" aria-label="Ace reaction" aria-hidden="true">
+    <header class="bar"><h3 style="margin:0">React with Ace?</h3></header>
+    <div class="body">
+      <p id="acePrompt" style="margin-top:0;color:var(--sub)"></p>
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="aceYes" class="btn-ok">🛡️ Block (roll d6)</button>
+        <button id="aceNo" class="btn-warn">Let it resolve</button>
+      </div>
+      <p style="margin:.5rem 0 0 0;font-size:12px;color:var(--sub)">
+        On 7/9: 1–3 fail (action proceeds), 4–6 block + counter +1. On Sigil: discard 2 Aces to auto-block.
+      </p>
+    </div>
+  </div>
+
+  <div class="drawer" id="sigilDrawer" aria-label="Play a Sigil" aria-hidden="true">
+    <header class="bar"><h3 style="margin:0">Play Sigil</h3></header>
+    <div class="body">
+      <p id="sigilHint" style="margin-top:0;color:var(--sub)"></p>
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="sigilPoints" class="btn-ok">Score Points</button>
+        <button id="sigilDraw"  class="btn-accent">Draw Cards</button>
+        <button id="sigilCancel" class="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer" id="rulesDrawer" aria-label="Rules" aria-modal="true" role="dialog" aria-hidden="true">
+    <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Rules</h3>
+      <button id="rulesClose" aria-label="Close rules">Close</button>
+    </header>
+    <div class="body" style="font-size:14px;color:var(--sub)">
+      <div style="display:grid;gap:10px">
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">🎯 Goal</h4>
+          <p style="margin:0">Reach <strong>60 points</strong> before your opponent.</p>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">🔄 Turn Flow</h4>
+          <ul style="margin:0 0 0 1rem;padding:0">
+            <li>End of your turn: <strong>draw 1</strong>.</li>
+            <li>If you start a turn with ≤ 1 card: <strong>draw 3</strong> (safety).</li>
+            <li>New game: deal 7 each. P1 starts.</li>
+          </ul>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">🧩 Constructs (score to discard pile)</h4>
+          <div style="display:grid;gap:8px">
+            <div>
+              <strong>Pairs</strong>
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li><strong>Pair</strong> (2 of same rank): <strong>2</strong> pts</li>
+                <li><strong>True Pair</strong> (same rank + same suit): <strong>5</strong> pts</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Sets</strong> (3+ of the same rank)
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li>3 cards: <code>2 × rank + 2</code> pts</li>
+                <li>4 cards: if all four suits present → <code>4 × rank</code>, else <code>3 × rank</code></li>
+                <li>5+ cards: <code>3 × rank + 2</code> pts</li>
+                <li><em>Suit bonus</em> applies if all non-Page cards are the same suit (see Suit Bonuses). With Pages, suit bonus only applies if size ≥ 5.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Runs</strong> (3+ in sequence, same suit)
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li>Score = sum of ranks + <code>+1</code> per card</li>
+                <li>Pages (Jokers) can fill gaps; if any Page is used: <strong>no suit bonus</strong> and <strong>−1 point per Page</strong></li>
+              </ul>
+            </div>
+            <div>
+              <strong>Using Pages (Jokers)</strong> in any non–Page-only construct
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li>For each Page used: discard <strong>one extra</strong> other card (Page cost)</li>
+                <li>For each Page used: total points get <strong>−1</strong></li>
+              </ul>
+            </div>
+            <div>
+              <strong>Page-only plays</strong> (discard these Pages to score)
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li>2 Pages → <strong>4</strong> pts</li>
+                <li>3 Pages → <strong>7</strong> pts and <strong>draw 3</strong></li>
+                <li>4 Pages → <strong>15</strong> pts and <strong>refill hand to 7</strong></li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">♥ ♣ ♦ ♠ Suit Bonuses</h4>
+          <ul style="margin:0 0 0 1rem;padding:0">
+            <li><strong>♥ Hearts</strong>: +3 pts</li>
+            <li><strong>♣ Clubs</strong>: take an extra turn (cap 2 in a row)</li>
+            <li><strong>♦ Diamonds</strong>: roll d6 → steal <strong>1/2/3</strong> points from opponent’s score</li>
+            <li><strong>♠ Spades</strong>: steal up to <strong>2 random cards</strong> from opponent’s hand</li>
+          </ul>
+          <p style="margin:6px 0 0 0;font-size:12px;opacity:.9">Suit bonus applies to Constructs where all non-Page cards share that suit (see Pages notes under Sets/Runs).</p>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">🎭 Actions (6 / 7 / 9)</h4>
+          <ul style="margin:0 0 0 1rem;padding:0">
+            <li><strong>6</strong>: Draw 2</li>
+            <li><strong>7</strong>: Steal 1 random card (Ace can attempt to block)</li>
+            <li><strong>9</strong>: Swap — give 1, take 1 (Ace can attempt to block)
+              <ul style="margin:4px 0 0 1rem;padding:0">
+                <li>If 9 is blocked: your “give” card is discarded</li>
+                <li>If 9 is not blocked: your “give” card goes to the defender</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">🂱 Aces (Defense & Counter)</h4>
+          <ul style="margin:0 0 0 1rem;padding:0">
+            <li>Against <strong>7/9</strong>: roll d6 → <strong>1–3 fail</strong> (action proceeds), <strong>4–6 block</strong> and you gain <strong>+1</strong> point</li>
+            <li>Against a <strong>Sigil</strong>: discard <strong>2 Aces</strong> to auto-block (Sigil is discarded)</li>
+          </ul>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">👑 Sigils (J / Q / K)</h4>
+          <ul style="margin:0 0 0 1rem;padding:0">
+            <li><strong>Points</strong>: J +1, Q +2, K +3</li>
+            <li><strong>Draw</strong>: J/Q +1, K +2</li>
+            <li>Opponent may auto-block by discarding <strong>2 Aces</strong></li>
+          </ul>
+        </section>
+
+        <section style="background:#0e1622;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <h4 style="margin:0 0 6px 0;color:var(--ink)">📦 Discard</h4>
+          <p style="margin:0">Discard any 1 card to gain <strong>+1 point</strong>.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Drawer -->
+  <div class="drawer" id="settingsDrawer" aria-label="Settings" aria-hidden="true">
+    <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Settings</h3>
+      <button id="settingsClose" aria-label="Close settings">Close</button>
+    </header>
+    <div class="body" style="font-size:14px;color:var(--sub)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label><input type="checkbox" id="optHaptics"> Haptics</label>
+        <label><input type="checkbox" id="optAnims" checked> Animations</label>
+        <label><input type="checkbox" id="optSwipe"> Swipe-to-discard</label>
+
+        <label>Card size
+          <select id="optCardSize">
+            <option value="auto">Auto</option>
+            <option value="compact">Compact</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+
+        <label>AI
+          <select id="optAI">
+            <option value="none">None (Online)</option>
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </label>
+
+        <label>Mode
+          <select id="optMode">
+            <option value="solo" selected>Solo vs AI</option>
+            <option value="online">Online Multiplayer</option>
+          </select>
+        </label>
+
+        <label>Role
+          <select id="optRole">
+            <option value="host" selected>Host (P1)</option>
+            <option value="guest">Guest (P2)</option>
+          </select>
+        </label>
+
+        <label>Room / Host ID
+          <input id="optRoom" placeholder="e.g. my-room-123" />
+        </label>
+
+        <div style="grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap">
+          <button id="btnConnect" class="btn-ok">🔌 Connect</button>
+          <button id="btnDisconnect" class="btn-warn">❌ Disconnect</button>
+          <span id="netStatus" class="pill">Offline</span>
+        </div>
+      </div>
+
+      <div class="panel" style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+        <button id="resetGame" class="btn-warn">Reset game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast region -->
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- === GAME LOGIC + ONLINE SYNC === -->
+  <script>
+  const $ = (id)=>document.getElementById(id);
+  const SUITS=['\\u2660','\\u2665','\\u2666','\\u2663']; // ♠ ♥ ♦ ♣
+  const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const RVAL=r=>({A:1,J:11,Q:12,K:13}[r]||parseInt(r,10));
+  const isPage=c=>c.page===true;
+  const isJQK=r=>r==='J'||r==='Q'||r==='K';
+  const rnd=n=>Math.floor(Math.random()*n);
+
+  const IMG_BASE="cards/";
+  const EXT=".webp";
+
+  function suitSlug(s){
+    return s==='\\u2665' ? 'hearts'
+         : s==='\\u2666' ? 'diamonds'
+         : s==='\\u2663' ? 'clubs'
+         :                'spades';
+  }
+  function rankSlug(r){
+    if (r==='A') return 'ace';
+    if (r==='J') return 'j';
+    if (r==='Q') return 'q';
+    if (r==='K') return 'k';
+    return r;
+  }
+  function suitGlyph(s){
+    if (s && s.length===1) return s;
+    const m=String(s||'').match(/u\\+?([0-9a-f]{4})/i);
+    return m ? String.fromCharCode(parseInt(m[1],16)) : (s||'');
+  }
+  function imgPath(c){
+    if (c.back) return IMG_BASE + "back" + EXT;
+    if (isPage(c)) return IMG_BASE + \`page \${c.pageIndex}\` + EXT; // ensure filenames match
+    return IMG_BASE + \`\${rankSlug(c.rank)} \${suitSlug(c.suit)}\` + EXT;
+  }
+
+  // Prefs & save
+  const PREF_KEY='arcana_prefs_v2';
+  const SAVE_KEY='arcana_state_v1';
+  const Pref={haptics:false, anims:true, swipe:false, cardSize:'auto', ai:'normal', mode:'solo', role:'host', room:''};
+  function loadPrefs(){try{const p=JSON.parse(localStorage.getItem(PREF_KEY)); if(p) Object.assign(Pref,p);}catch{}}
+  function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(Pref));}catch{}}
+
+  const PREFERS_REDUCED_MOTION=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  function buzz(ms=20){try{ if(PREFERS_REDUCED_MOTION) return; Pref.haptics && navigator.vibrate && navigator.vibrate(ms);}catch{}}
+
+  // Toasts (with cap)
+  function toast(html,ms=1650){
+    const host=$('toast');
+    while(host.children.length>4) host.firstChild.remove();
+    const t=document.createElement('div');
+    t.className='toast anim-in'; t.innerHTML=html;
+    host.appendChild(t);
+    setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),320);},ms);
+  }
+  function toastSafe(text,ms=1650){
+    const host=$('toast');
+    while(host.children.length>4) host.firstChild.remove();
+    const t=document.createElement('div');
+    t.className='toast anim-in'; t.textContent=text;
+    host.appendChild(t);
+    setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),320);},ms);
+  }
+
+  // Anim helpers
+  function addAnim(el,cls,ms=400){
+    if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
+    el.classList.add(cls);
+    const kill=()=>el.classList.remove(cls);
+    el.addEventListener('animationend',kill,{once:true});
+    setTimeout(kill,ms+50);
+  }
+  function bumpScore(pid){
+    const id=(pid===myPid())?'scoreYou':'scoreAI';
+    const el=$(id); addAnim(el,'anim-bump',240);
+  }
+  function flashLogLast(){
+    const logEl=$('log'); if(!logEl) return;
+    const last=logEl.lastElementChild; if(last) addAnim(last,'anim-flash',600);
+  }
+
+  // Drawer helpers: focus, aria-hidden, ESC to close
+  function markDrawerState(){const anyOpen=!!document.querySelector('.drawer.open');document.body.classList.toggle('drawer-open', anyOpen);}
+  function openDrawer(el){
+    el.classList.add('open');
+    document.querySelectorAll('.drawer').forEach(d=>{
+      const active = d===el && d.classList.contains('open');
+      d.setAttribute('aria-hidden', String(!active));
+    });
+    markDrawerState();
+    const first = el.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
+    first?.focus();
+  }
+  function closeDrawer(el){
+    el.classList.remove('open');
+    el.setAttribute('aria-hidden','true');
+    markDrawerState();
+  }
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape'){
+      const open=document.querySelector('.drawer.open');
+      if(open){ e.preventDefault(); closeDrawer(open); }
+    }
+  });
+
+  // === STATE SERIALIZATION (with masking) ===
+  function serialize(){
+    return JSON.stringify({deck:G.deck,discard:G.discard,players:G.players,turn:G.turn,started:G.started,clubChain:G.clubChain});
+  }
+  function serializeFor(viewerPid){
+    const maskHand=(h)=>h.map(_=>({back:true}));
+    const players=[
+      (viewerPid===0? {hand:[...G.players[0].hand],score:G.players[0].score}
+                    : {hand:maskHand(G.players[0].hand),score:G.players[0].score}),
+      (viewerPid===1? {hand:[...G.players[1].hand],score:G.players[1].score}
+                    : {hand:maskHand(G.players[1].hand),score:G.players[1].score})
+    ];
+    const deckLensafe=Array(G.deck.length).fill({back:true});
+    return JSON.stringify({ deck:deckLensafe, discard:[...G.discard], players, turn:G.turn, started:G.started, clubChain:G.clubChain });
+  }
+  function deserialize(s){try{const o=JSON.parse(s); if(!o||!Array.isArray(o.deck)) return null; return o;}catch{return null;}}
+
+  // Network
+  const Net={
+    ws:null, connected:false, hostId:null, connecting:false,
+    isOnline(){return Pref.mode==='online' && this.connected;},
+    connect(){
+      if(this.connected||this.connecting) return;
+      this.connecting=true;
+      try{this.ws?.close()}catch{}
+      const url=(location.protocol==='https:'?'wss':'ws')+'://arcana-signal.onrender.com';
+      this.ws=new WebSocket(url);
+      this.ws.onopen=()=>{
+        this.connected=true; this.connecting=false;
+        $('netStatus').textContent='Connected';
+        if(Pref.role==='host'){
+          this.hostId=Pref.room || ('room-'+Math.random().toString(36).slice(2,8));
+          send({type:'host',hostId:this.hostId});
+          toastSafe(`Room: ${this.hostId}`); log(`Hosting room: ${this.hostId}`);
+        }else{
+          this.hostId=Pref.room;
+          if(!this.hostId){ log('Enter a Room/Host ID, then Connect.'); return; }
+          send({type:'join',hostId:this.hostId});
+          toastSafe(`Joining: ${this.hostId}`); log(`Joining room: ${this.hostId}`);
+        }
+        updateModeTag(); updateStartDisabled();
+      };
+      this.ws.onclose=()=>{
+        this.connected=false; this.connecting=false; $('netStatus').textContent='Offline';
+        updateModeTag(); updateStartDisabled();
+      };
+      this.ws.onmessage=(ev)=>{
+        let m={}; try{m=JSON.parse(ev.data);}catch{return;}
+        if(m.type==='host-ok'){ toastSafe(`Room ready: ${m.hostId}`) }
+        if(m.type==='join-ok'){ toastSafe(`Joined: ${m.hostId}`) }
+        if(m.type==='guest-joined'){ toast('Guest joined.'); if(Pref.role==='host'){ sendSync(1) } }
+        if(m.type==='guest-left'){ toast('Guest left.') }
+        if(m.type==='host-left'){ toast('Host left.') }
+        if(m.type==='host-error'){ toastSafe(`Host error: ${m.reason||'unknown'}`) }
+        if(m.type==='join-error'){ toastSafe(`Join failed: ${m.reason||'host-not-found'}`) }
+        if(m.type==='signal' && m.payload){ onSignal(m.payload) }
+      };
+      function send(obj){ try{ Net.ws && Net.ws.readyState===1 && Net.ws.send(JSON.stringify(obj)) }catch{} }
+      Net._sendRaw=send;
+    },
+    disconnect(){ try{this.ws?.close()}catch{}; this.ws=null; this.connected=false; this.connecting=false; $('netStatus').textContent='Offline'; updateModeTag(); updateStartDisabled(); },
+  };
+  function sendSig(payload){ if(Net.ws && Net.ws.readyState===1){ Net._sendRaw({type:'signal', hostId:Net.hostId, payload}) } }
+  function sendSync(toPid){
+    const state=(Pref.role==='host') ? serializeFor(toPid) : serialize();
+    sendSig({kind:'SYNC', state});
+  }
+
+  // Game state
+  const G={deck:[],discard:[],players:[{hand:[],score:0},{hand:[],score:0}],turn:0,started:false,selected:new Set(),chooseGive:null,aceQuery:null,clubChain:0};
+  const Prev={handCounts:[0,0]};
+
+  function buildDeck(){
+    const cards=[]; let id=1;
+    for(let copies=0; copies<2; copies++){
+      for(const s of SUITS){ for(const r of RANKS){ cards.push({id:id++,suit:s,rank:r}) } }
+    }
+    for(let i=1;i<=4;i++){ cards.push({id:id++,page:true,rank:'Page',suit:'',pageIndex:i}) }
+    shuffle(cards); return cards;
+  }
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}}
+
+  function saveState(){ if(Pref.mode==='online' && Pref.role==='guest') return; try{localStorage.setItem(SAVE_KEY,serialize())}catch{} }
+  function loadState(){const raw=localStorage.getItem(SAVE_KEY);const o=deserialize(raw);if(!o) return false;Object.assign(G,o);Prev.handCounts=[G.players[0].hand.length,G.players[1].hand.length];return true}
+
+  function myPid(){ return (Pref.mode==='online' ? (Pref.role==='host'?0:1) : 0) }
+
+  // DRAW / RECYCLE
+  function recycleIfNeeded(){
+    if(G.deck.length===0 && G.discard.length>0){
+      G.deck.push(...G.discard.splice(0,G.discard.length));
+      shuffle(G.deck);
+      log('Deck reshuffled.');
+    }
+  }
+  function draw(pid,n){
+    for(let i=0;i<n;i++){
+      if(G.deck.length===0) recycleIfNeeded();
+      if(G.deck.length===0) break;
+      G.players[pid].hand.push(G.deck.pop());
+    }
+  }
+  function endOfTurnDraw(pid){ draw(pid,1) }
+
+  function render(){
+    $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
+    $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
+    $('turnTag').textContent=G.started?(G.turn===myPid()?'Your turn':(Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn'))):'—';
+    $('modeTag').textContent = Pref.mode==='online' ? (Pref.role.toUpperCase() + ' • ' + (Net.connected?'ONLINE':'OFFLINE')) : ('SOLO • ' + Pref.ai.toUpperCase());
+
+    const yh=$('yourHand'), ah=$('aiHand'); yh.innerHTML=''; ah.innerHTML='';
+    // Your hand (fronts)
+    G.players[myPid()].hand.forEach((c)=>{
+      const n=cardNode(c,true);
+      n.tabIndex=0;
+      n.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleSelect(c.id,n) } };
+      if(G.selected.has(c.id)) n.classList.add('selected');
+
+      let pressTimer=null, wasLong=false, startX=null;
+      n.onpointerdown=(e)=>{ wasLong=false; startX=e.clientX; pressTimer=setTimeout(()=>{wasLong=true; toggleSelect(c.id,n); buzz(12); addAnim(n,'anim-pop',180)},220) };
+      n.onpointerup=(e)=>{ clearTimeout(pressTimer);
+        const swiped=(Pref.swipe && startX!=null && Math.abs(e.clientX-startX)>90);
+        if(swiped && G.turn===myPid()){ G.selected.clear(); G.selected.add(c.id); userAction({type:'DISCARD',pid:myPid(),cardId:c.id}) }
+        else if(!wasLong){ toggleSelect(c.id,n); buzz(8); addAnim(n,'anim-pop',180) }
+        startX=null;
+      };
+      n.onpointercancel=n.onpointerleave=()=>{ clearTimeout(pressTimer); startX=null };
+      yh.appendChild(n);
+    });
+    $('youCount').textContent=G.players[myPid()].hand.length;
+
+    // Opponent hand (backs)
+    G.players[1-myPid()].hand.forEach(_=>{
+      const d=cardNode({back:true},false);
+      ah.appendChild(d);
+    });
+    $('aiCount').textContent=G.players[1-myPid()].hand.length;
+
+    // Deal-in animations on count increase
+    const cur0=G.players[0].hand.length, cur1=G.players[1].hand.length;
+    if(cur0>Prev.handCounts[0] && myPid()===0){ const last=yh.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+    if(cur1>Prev.handCounts[1] && myPid()===1){ const last=yh.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+    if(cur0>Prev.handCounts[0] && myPid()===1){ const last=ah.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+    if(cur1>Prev.handCounts[1] && myPid()===0){ const last=ah.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+    Prev.handCounts=[cur0,cur1];
+
+    // Buttons
+    const myTurn=G.started && (G.turn===myPid());
+    ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'].forEach(id=>{
+      const el=$(id); if(el){ el.disabled=!myTurn; el.setAttribute('aria-disabled', String(!myTurn)) }
+    });
+    updateStartDisabled();
+  }
+  function updateStartDisabled(){
+    const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
+    ['btnStart','mbStart'].forEach(id=>{ const el=$(id); if(el){ el.disabled=shouldDisableStart; el.setAttribute('aria-disabled', String(shouldDisableStart)) }})
+  }
+
+  function cardNode(c,show){
+    const d=document.createElement('div');
+    d.className='card';
+    const t=typeOf(c);
+
+    if(show){
+      d.style.backgroundImage=\`url("\${imgPath(c)}")\`;
+
+      if(!isPage(c)){
+        const chip=document.createElement('div');
+        chip.className='rank';
+        chip.textContent=\`\${c.rank ?? ''}\${suitGlyph(c.suit || '')}\`;
+        d.appendChild(chip);
+      }
+      if(t==='Page'){
+        const tag=document.createElement('div');
+        tag.className='tag';
+        tag.textContent=t;
+        d.appendChild(tag);
+      }
+      // Accessible name & state
+      const suitWord = isPage(c) ? '' : suitSlug(c.suit);
+      d.setAttribute('role','button');
+      d.setAttribute('aria-label', isPage(c) ? 'Page (Joker)' : \`\${c.rank} of \${suitWord}\`);
+      d.setAttribute('aria-pressed', G.selected.has(c.id)?'true':'false');
+    } else {
+      d.classList.add('back');
+      d.style.backgroundImage=\`url("\${IMG_BASE}back\${EXT}")\`;
+      d.setAttribute('aria-hidden','true');
+    }
+    return d;
+  }
+
+  function toggleSelect(id,node){
+    if(G.turn!==myPid()) return;
+    const on=G.selected.has(id);
+    if(on){ G.selected.delete(id); node.classList.remove('selected'); node.setAttribute('aria-pressed','false') }
+    else { G.selected.add(id); node.classList.add('selected'); node.setAttribute('aria-pressed','true') }
+  }
+  function typeOf(c){
+    if(isPage(c)) return 'Page';
+    if(isJQK(c.rank)) return 'Sigil';
+    if(c.rank==='A') return 'Ace';
+    if(c.rank==='6'||c.rank==='7'||c.rank==='9') return 'Action';
+    return 'Normal';
+  }
+
+  function startNew(){
+    G.deck=buildDeck(); G.discard=[]; G.players=[{hand:[],score:0},{hand:[],score:0}];
+    G.turn=0; G.started=true; G.selected.clear(); G.clubChain=0;
+    draw(0,7); draw(1,7); log('New game. P1 starts.'); render(); maybeSafetyDraw(); saveState();
+  }
+  function discardFromHandById(pid,id){
+    const h=G.players[pid].hand; const i=h.findIndex(c=>c.id===id);
+    if(i<0) return null; const c=h.splice(i,1)[0]; G.discard.push(c); return c;
+  }
+  function takeFromHandById(pid,id){
+    const h=G.players[pid].hand; const i=h.findIndex(c=>c.id===id);
+    if(i<0) return null; return h.splice(i,1)[0];
+  }
+  function removeFromHandByIds(pid,ids){
+    const h=G.players[pid].hand, out=[];
+    ids.forEach(id=>{const i=h.findIndex(c=>c.id===id); if(i>=0) out.push(h.splice(i,1)[0])});
+    return out;
+  }
+  function endTurn(){
+    draw(G.turn,1);
+    G.turn=1-G.turn; G.selected.clear(); G.clubChain=0;
+    render(); maybeSafetyDraw(); saveState();
+    if(G.started && Pref.mode==='solo' && G.turn===1) setTimeout(aiTakeTurn,380);
+    if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
+  }
+  function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(\`\${pid===0?'P1':'P2'} drew 3 (safety).\`); render() } }
+
+  function validateConstruct(cards){
+    const res={valid:false,kind:'',points:0,suit:null,jokersUsed:0,suitBonus:null,reason:''};
+    const pages=cards.filter(isPage), non=cards.filter(c=>!isPage(c));
+    res.jokersUsed=pages.length;
+
+    if(non.length===0){
+      if(pages.length===2){res.valid=true;res.kind='PAGE_ONLY';res.points=4;return res;}
+      if(pages.length===3){res.valid=true;res.kind='PAGE_ONLY';res.points=7;res.bonus={draw:3};return res;}
+      if(pages.length===4){res.valid=true;res.kind='PAGE_ONLY';res.points=15;res.bonus={refill:true};return res;}
+      res.reason='Need 2–4 Pages for Page-only'; return res;
+    }
+
+    const sameSuit=non.every(c=>c.suit===non[0].suit);
+    const suit=sameSuit?non[0].suit:null;
+    res.suit=suit;
+
+    if(cards.length===2 && pages.length===0){
+      if(non[0].rank===non[1].rank){
+        const pts=(non[0].suit===non[1].suit)?5:2;
+        res.valid=true;res.kind=(pts===5?'TRUE_PAIR':'PAIR');res.points=pts;
+        if(pts===5 && suit) applySuitBonus(res,true);
+        return res;
+      }
+    }
+
+    if(pages.length===0 && non.length>=3 && non.every(c=>c.rank===non[0].rank)){
+      const r=RVAL(non[0].rank), n=cards.length; let pts=0;
+      if(n===3) pts=2*r+2;
+      else if(n===4){ const suits=new Set(non.map(c=>c.suit)); pts=(suits.size===4)?4*r:3*r; }
+      else if(n>=5) pts=3*r+2;
+      res.valid=true;res.kind='SET';res.points=pts; if(suit) applySuitBonus(res,true);
+      return res;
+    }
+
+    if(non.length>=2 && non.every(c=>c.rank===non[0].rank) && cards.length>=3 && pages.length>0){
+      const r=RVAL(non[0].rank), n=cards.length; let pts=(n===4?3*r:3*r+2);
+      res.valid=true;res.kind='SET';res.points=pts; if(suit && n>=5) applySuitBonus(res,true);
+      res.points-=pages.length; return res;
+    }
+
+    if(sameSuit && cards.length>=3){
+      const vals=non.map(c=>RVAL(c.rank)).sort((a,b)=>a-b);
+      let gaps=0;
+      for(let i=1;i<vals.length;i++){
+        const diff=vals[i]-vals[i-1];
+        if(diff<=0){ res.reason='Duplicate ranks in run'; return res }
+        gaps+=(diff-1);
+      }
+      if(gaps<=pages.length){
+        res.valid=true;res.kind='RUN';
+        const sum=non.reduce((s,c)=>s+RVAL(c.rank),0);
+        res.points=sum+cards.length;
+        if(pages.length===0) applySuitBonus(res,true); else res.points-=pages.length;
+        return res;
+      }
+    }
+
+    res.reason='Not a valid Construct'; return res;
+  }
+  function applySuitBonus(res,allow){
+    if(!res.suit || !allow) return;
+    if(res.suit==='\\u2665'){ res.points+=3; res.suitBonus='HEARTS' }
+    if(res.suit==='\\u2663'){ res.suitBonus='CLUBS' }
+    if(res.suit==='\\u2666'){ res.suitBonus='DIAMONDS' }
+    if(res.suit==='\\u2660'){ res.suitBonus='SPADES' }
+  }
+  function currentSelected(pid){
+    const ids=[...G.selected]; return G.players[pid].hand.filter(c=>ids.includes(c.id));
+  }
+  function attemptConstruct(pid){
+    const cards=currentSelected(pid);
+    if(cards.length<2){ log('Select 2+ cards for a construct'); return null }
+    const check=validateConstruct(cards);
+    if(!check.valid){ log(check.reason||'Invalid construct'); return null }
+
+    if(check.jokersUsed>0 && check.kind!=='PAGE_ONLY'){
+      const excluded=new Set(cards.map(c=>c.id));
+      const pool=G.players[pid].hand.filter(c=>!excluded.has(c.id)&&!isPage(c));
+      if(pool.length<check.jokersUsed){ log('Not enough cards to pay Page cost'); return null }
+
+      if(Pref.mode==='solo' || pid!==myPid()){
+        pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
+        const extras=pool.slice(0,check.jokersUsed).map(c=>c.id);
+        return {type:'CONSTRUCT',pid,ids:cards.map(c=>c.id),extras,info:check};
+      } else {
+        openPayDrawer(pid,cards.map(c=>c.id),check.jokersUsed,pool); return null;
+      }
+    }
+    return {type:'CONSTRUCT',pid,ids:cards.map(c=>c.id),extras:[],info:check};
+  }
+
+  // LOG
+  function log(s){
+    const el=$('log'); if(el){ const d=document.createElement('div'); d.className='line'; d.textContent=s; el.appendChild(d); el.scrollTop=el.scrollHeight; flashLogLast() }
+    if(Net.isOnline() && Pref.role==='host'){ sendSig({kind:'LOG', text:s}) }
+  }
+
+  // APPLY core
+  function applyAction(act){
+    const pid=act.pid; const opp=1-pid;
+    switch(act.type){
+      case 'START': startNew(); if(Net.isOnline() && Pref.role==='host'){ sendSync(1) } return;
+
+      case 'CONSTRUCT': {
+        const cards=removeFromHandByIds(pid,act.ids); const check=validateConstruct(cards);
+        if(!check.valid){ G.players[pid].hand.push(...cards); log('Invalid construct (check)'); render(); return }
+        if(check.kind!=='PAGE_ONLY' && check.jokersUsed>0){
+          const extraCards=removeFromHandByIds(pid,act.extras);
+          if(extraCards.length!==check.jokersUsed){ G.players[pid].hand.push(...cards,...extraCards); log('Page cost mismatch'); render(); return }
+          G.discard.push(...extraCards);
+        }
+        G.players[pid].score+=check.points; bumpScore(pid);
+        G.discard.push(...cards);
+        log(\`\${pid===0?'P1':'P2'} played \${check.kind} for +\${check.points}.\`); buzz(20);
+
+        if(check.kind==='PAGE_ONLY'){
+          if(check.bonus?.draw){ draw(pid,check.bonus.draw); log(\`Drew \${check.bonus.draw}.\`) }
+          if(check.bonus?.refill){ const need=Math.max(0,7-G.players[pid].hand.length); if(need>0){ draw(pid,need); log('Refilled to 7.') } }
+        }
+        if(check.suitBonus==='DIAMONDS'){
+          const roll=1+Math.floor(Math.random()*6);
+          const steal=(roll<=2)?1:(roll<=4)?2:3;
+          const give=Math.min(steal,G.players[opp].score);
+          G.players[opp].score-=give; G.players[pid].score+=give; bumpScore(pid);
+          log(\`♦ d6=\${roll} → stole \${give}.\`); toast(\`<div>♦ Diamonds roll: <span class="die">\${roll}</span> → +\${give}</div>\`);
+        }
+        if(check.suitBonus==='SPADES'){
+          const oppH=G.players[opp].hand;
+          for(let i=0;i<2 && oppH.length>0;i++){ const j=rnd(oppH.length); const c=oppH.splice(j,1)[0]; G.players[pid].hand.push(c) }
+          log(\`♠ stole up to 2 random card(s).\`); toast(`<div>♠ Stole up to 2 random cards</div>`);
+        }
+
+        const extraTurn=(check.suitBonus==='CLUBS');
+        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+
+        if(extraTurn){
+          endOfTurnDraw(pid);
+          G.clubChain=(G.turn===pid ? G.clubChain+1 : 1);
+          if(G.clubChain<=2){
+            log(\`\${pid===0?'P1':'P2'} take an extra turn (\${G.clubChain}/2).\`);
+            render(); maybeSafetyDraw(); saveState();
+            if(Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn,380);
+            if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
+            return;
+          } else {
+            log(\`Clubs extra-turn cap reached (2); passing turn.\`); G.clubChain=0;
+          }
+        }
+        G.selected.clear(); endTurn(); return;
+      }
+
+      case 'ACTION_6': {
+        const c=discardFromHandById(pid,act.cardId);
+        if(!c){ log('6: invalid card.'); return }
+        draw(pid,2); log(\`\${pid===0?'P1':'P2'} played 6 (Draw2).\`); G.selected.clear(); endTurn(); return;
+      }
+
+      case 'ACTION_7': {
+        const c=discardFromHandById(pid,act.cardId);
+        if(!c){ log('7: invalid card.'); return }
+        G.selected.clear(); return queryAce('A7',pid,1-pid,{cardId:act.cardId});
+      }
+
+      case 'ACTION_9': {
+        const giveCard=G.players[pid].hand.find(c=>c.id===act.giveId);
+        if(!giveCard){ log('9: invalid give card.'); return }
+        const nine=G.players[pid].hand.find(c=>c.id===act.cardId && c.rank==='9');
+        if(!nine){ log('9: invalid 9.'); return }
+        discardFromHandById(pid,nine.id); takeFromHandById(pid,giveCard.id);
+        G.selected.clear(); return queryAce('A9',pid,1-pid,{give:giveCard});
+      }
+
+      case 'SIGIL': {
+        const s=G.players[pid].hand.find(c=>c.id===act.cardId && isJQK(c.rank));
+        if(!s || s.rank!==act.rank){ log('Sigil: invalid card.'); return }
+        const r=s.rank; discardFromHandById(pid,s.id);
+        const target=1-pid; const tHand=G.players[target].hand;
+        const aceCount=tHand.filter(c=>c.rank==='A').length;
+
+        if(aceCount>=2){
+          if(Net.isOnline() && Pref.role==='host' && target===1){
+            G.aceQuery={kind:'ASIG',actor:pid,target,info:{rank:r,mode:act.mode}};
+            sendSig({kind:'ACE_PROMPT', data:{kind:'ASIG', rank:r, mode:act.mode}});
+            log(\`Sigil \${r}: waiting for defender...\`); return;
+          }
+          if(target===1 && Pref.mode==='solo'){
+            spendNAces(target,2); log(\`Sigil blocked by 2 Aces → Sigil discarded.\`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`); endTurn(); return;
+          }
+          if(target===0){
+            G.aceQuery={kind:'ASIG',actor:pid,target,info:{rank:r,mode:act.mode}};
+            $('acePrompt').textContent=\`Opponent played \${r}. Discard 2 Aces to block?\`; openAceDrawer(); return;
+          }
+        }
+
+        if(act.mode==='points'){ const add=(r==='J'?1:r==='Q'?2:3); G.players[pid].score+=add; bumpScore(pid); log(\`\${pid===0?'P1':'P2'} played \${r}: +\${add}.\`) }
+        else { const drawN=(r==='K'?2:1); draw(pid,drawN); log(\`\${pid===0?'P1':'P2'} played \${r}: draw \${drawN}.\`) }
+
+        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        G.selected.clear(); endTurn(); return;
+      }
+
+      case 'DISCARD': {
+        const c=discardFromHandById(pid,act.cardId);
+        if(!c){ log('Invalid discard.'); return }
+        G.players[pid].score+=1; bumpScore(pid);
+        log(\`\${pid===0?'P1':'P2'} discarded \${c ? (c.rank + suitGlyph(c.suit)) : '—'} for +1.\`);
+        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        G.selected.clear(); endTurn(); return;
+      }
+    }
+  }
+
+  function aceResolveNoUse(kind,actor,target,info){
+    if(kind==='A7'){
+      const th=G.players[target].hand;
+      if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('7: stole a random card.'); toast('<div>7 resolved: stole a random card</div>') }
+      else log('7: defender had no cards.');
+      return endTurn();
+    }
+    if(kind==='A9'){
+      const th=G.players[target].hand;
+      if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('9: swapped one card.'); toast('<div>9 resolved: swapped one card</div>') }
+      else log('9: defender had no cards.');
+      if(info?.give) G.players[target].hand.push(info.give);
+      return endTurn();
+    }
+    if(kind==='ASIG'){
+      const {rank,mode}=info||{};
+      if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(\`\${actor===0?'P1':'P2'} played \${rank}: +\${add}.\`) }
+      else { const drawN=(rank==='K'?2:1); draw(actor,drawN); log(\`\${actor===0?'P1':'P2'} played \${rank}: draw \${drawN}.\`) }
+      if(G.players[actor].score>=60){ log(\`\${actor===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+      return endTurn();
+    }
+  }
+
+  function queryAce(kind,actor,target,info){
+    if(Net.isOnline() && Pref.role==='host' && target===1){
+      G.aceQuery={kind,actor,target,info};
+      sendSig({kind:'ACE_PROMPT', data:{kind,actor,target,info}});
+      log('Waiting for defender...'); return;
+    }
+    if(target===0){
+      if((kind==='A7'||kind==='A9') && !haveNAces(target,1)) return aceResolveNoUse(kind,actor,target,info);
+      if(kind==='ASIG' && !haveNAces(target,2)) return aceResolveNoUse(kind,actor,target,info);
+      G.aceQuery={kind,actor,target,info};
+      $('acePrompt').textContent=
+        kind==='A7'?"Use an Ace to try to block 7? (d6: 4–6 blocks + counter)":
+        kind==='A9'?"Use an Ace to try to block 9? (d6: 4–6 blocks + counter)":
+        'Use 2 Aces to auto-block the Sigil?';
+      openAceDrawer(); return;
+    }
+    if(Pref.mode==='solo' && target===1){
+      const use=aiWantsAce(target);
+      if(!use) return aceResolveNoUse(kind,actor,target,info);
+      const roll=1+Math.floor(Math.random()*6);
+      if(roll<=3){ log(\`Ace block (d6=\${roll}) → FAIL.\`); toast(\`<div>🂱 Ace roll <span class='die'>\${roll}</span> → fail</div>\`); return aceResolveNoUse(kind,actor,target,info) }
+      else { spendNAces(target,1); G.players[target].score+=1; bumpScore(target); if(kind==='A9'&&info?.give) G.discard.push(info.give); log(\`Ace block (d6=\${roll}) → BLOCKED +1.\`); toast(\`<div>🛡️ Ace roll <span class='die'>\${roll}</span> → block +1</div>\`); return endTurn() }
+    }
+  }
+
+  function spendNAces(pid,n){
+    const h=G.players[pid].hand; let used=0;
+    for(let i=0;i<h.length&&used<n;){ if(h[i].rank==='A'){ G.discard.push(h.splice(i,1)[0]); used++ } else i++ }
+    return used===n;
+  }
+  function haveNAces(pid,n){ return G.players[pid].hand.filter(c=>c.rank==='A').length>=n }
+
+  // === AI ===
+  function aiFind(pid,rank){ return G.players[pid].hand.find(c=>c.rank===rank) }
+  function aiPickSigil(pid){
+    const h=G.players[pid].hand; const s=h.find(c=>isJQK(c.rank)); if(!s) return null;
+    let mode='points';
+    if(Pref.ai==='easy') mode=(h.length<=6?'draw':'points');
+    else if(Pref.ai==='hard') mode=(G.players[pid].score< G.players[1-pid].score? 'points':'draw');
+    else if(Pref.ai==='expert'){
+      const need=60-G.players[pid].score;
+      const gain=(s.rank==='J'?1:s.rank==='Q'?2:3);
+      if(gain>=need) return {id:s.id,rank:s.rank,mode:'points'};
+      if(h.length<=3) return {id:s.id,rank:s.rank,mode:'draw'};
+      const after=G.players[pid].score+gain; const opp=G.players[1-pid].score;
+      const m=(after>=opp || h.length>=6)?'points':'draw'; return {id:s.id,rank:s.rank,mode:m};
+    } else mode=(h.length<=4?'draw':'points');
+    return {id:s.id,rank:s.rank,mode};
+  }
+  function aiPickTrash(pid){
+    const h=G.players[pid].hand.slice();
+    const val=(c)=> isPage(c)?100 : c.rank==='A'?90 : c.rank==='K'?80 : c.rank==='Q'?75 : c.rank==='J'?70 : c.rank==='9'?60 : c.rank==='7'?55 : c.rank==='6'?50 : RVAL(c.rank);
+    if(Pref.ai==='expert'){ h.sort((a,b)=>val(a)-val(b)); return h[0] }
+    h.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return h[0];
+  }
+  function aiChooseGive(pid,nineId){
+    const pool=G.players[pid].hand.filter(c=>c.id!==nineId).slice();
+    const val=(c)=> isPage(c)?100 : c.rank==='A'?90 : c.rank==='K'?80 : c.rank==='Q'?75 : c.rank==='J'?70 : c.rank==='9'?60 : c.rank==='7'?55 : c.rank==='6'?50 : RVAL(c.rank);
+    if(Pref.ai==='expert'){ pool.sort((a,b)=>val(a)-val(b)); return pool[0]?.id }
+    pool.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return pool[0]?.id;
+  }
+  function aiWantsAce(pid){
+    const me=G.players[pid], opp=G.players[1-pid];
+    const myAces=me.hand.filter(c=>c.rank==='A').length; if(myAces===0) return false;
+    if(Pref.ai==='easy') return Math.random()<0.35;
+    if(Pref.ai==='hard') return Math.random()<0.8 || 60-me.score<=5 || 60-opp.score<=5 || me.hand.length>=5;
+    if(Pref.ai==='expert'){ const meTo60=60-me.score, oppTo60=60-opp.score; if(oppTo60<=4||meTo60<=5) return true; if(me.hand.length>=5) return true; return Math.random()<0.85 }
+    return Math.random()<0.6 || 60-me.score<=5 || 60-opp.score<=5;
+  }
+  function combos(arr,k,cap=9999){
+    const out=[]; const n=arr.length;
+    const rec=(start,take,buf)=>{ if(out.length>=cap) return; if(take===0){ out.push(buf.slice()); return } for(let i=start;i<=n-take;i++){ buf.push(arr[i]); rec(i+1,take-1,buf); buf.pop(); if(out.length>=cap) return } };
+    rec(0,k,[]); return out;
+  }
+  function aiBestConstruct(pid){
+    const hand=G.players[pid].hand; let best=null,bestPts=-999;
+    const ids=hand.map(c=>c.id);
+    const cap=(Pref.ai==='hard'?600:(Pref.ai==='easy'?120:(Pref.ai==='expert'?1400:250)));
+    for(let len=Math.min(7,hand.length);len>=2;len--){
+      const comb=combos(ids,len,cap);
+      for(const set of comb){
+        const cards=hand.filter(c=>set.includes(c.id));
+        const check=validateConstruct(cards);
+        if(!check.valid) continue;
+        let score=check.points;
+        if(Pref.ai==='expert' && check.kind!=='PAGE_ONLY'){
+          const usesJokers=cards.some(isPage), usesPower=cards.some(c=> c.rank==='A'||isJQK(c.rank)||c.rank==='6'||c.rank==='7'||c.rank==='9');
+          if(usesJokers) score-=0.5*check.jokersUsed;
+          if(usesPower) score-=0.4;
+          if(check.suitBonus==='HEARTS') score+=0.3;
+          if(check.suitBonus==='CLUBS') score+=0.6;
+        }
+        if(score>bestPts){
+          bestPts=score; best={ids:set.slice(),info:check,extras:[]};
+          if(check.jokersUsed>0 && check.kind!=='PAGE_ONLY'){
+            const excluded=new Set(set); const pool=hand.filter(c=>!excluded.has(c.id)&&!isPage(c));
+            pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
+            if(pool.length>=check.jokersUsed){ best.extras=pool.slice(0,check.jokersUsed).map(c=>c.id) } else { best=null }
+          }
+        }
+      }
+      if(best) break;
+    }
+    return best;
+  }
+  function aiTakeTurn(){
+    if(!G.started||G.turn!==1) return;
+    const pid=1;
+    const best=aiBestConstruct(pid); if(best){ applyAction({type:'CONSTRUCT',pid,ids:best.ids,extras:best.extras||[],info:best.info}); return }
+    const sig=aiPickSigil(pid); if(sig){ applyAction({type:'SIGIL',pid,rank:sig.rank,cardId:sig.id,mode:sig.mode}); return }
+    const a7=aiFind(pid,'7'); if(a7 && G.players[0].hand.length>0){ applyAction({type:'ACTION_7',pid,cardId:a7.id}); return }
+    const a9=aiFind(pid,'9'); if(a9 && G.players[0].hand.length>0){ const giveId=aiChooseGive(pid,a9.id); applyAction({type:'ACTION_9',pid,cardId:a9.id,giveId}); return }
+    const a6=aiFind(pid,'6'); if(a6 && G.players[pid].hand.length<=5){ applyAction({type:'ACTION_6',pid,cardId:a6.id}); return }
+    const toss=aiPickTrash(pid); applyAction({type:'DISCARD',pid:pid,cardId:toss.id}); return;
+  }
+
+  // Online messages
+  function onSignal(p){
+    if(p.kind==='SYNC'){ const o=deserialize(p.state); if(o){ Object.assign(G,o); render() } }
+    if(p.kind==='LOG'){
+      const el=$('log');
+      if(el){ const d=document.createElement('div'); d.className='line'; d.textContent=p.text; el.appendChild(d); el.scrollTop=el.scrollHeight; flashLogLast() }
+    }
+    if(p.kind==='INPUT' && Pref.role==='host'){ const act=p.act; if(!act) return; act.pid=1; applyAction(act); sendSync(1) }
+    if(p.kind==='ACE_PROMPT'){
+      if(Pref.role==='guest'){
+        const q=p.data;
+        G.aceQuery={kind:q.kind,actor:0,target:1,info:q.info||{rank:q.rank,mode:q.mode}};
+        $('acePrompt').textContent=
+          q.kind==='A7'?"Use an Ace to try to block 7? (d6: 4–6 blocks + counter)":
+          q.kind==='A9'?"Use an Ace to try to block 9? (d6: 4–6 blocks + counter)":
+          'Use 2 Aces to auto-block the Sigil?';
+        openAceDrawer();
+      }
+    }
+    if(p.kind==='ACE_RESPONSE' && Pref.role==='host'){
+      const {use}=p; const {kind,actor,target,info}=G.aceQuery||{};
+      if(!kind) return;
+      if(kind==='ASIG'){
+        if(use && haveNAces(1,2)){ spendNAces(1,2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`); G.aceQuery=null; endTurn(); return }
+        G.aceQuery=null; return aceResolveNoUse('ASIG',actor,target,info);
+      } else {
+        if(!use){ G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
+        const roll=1+Math.floor(Math.random()*6);
+        if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
+        else { spendNAces(1,1); G.players[1].score+=1; bumpScore(1); if(kind==='A9'&&info?.give) G.discard.push(info.give); log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`); G.aceQuery=null; return endTurn() }
+      }
+    }
+  }
+
+  // Drawers logic (now using openDrawer/closeDrawer)
+  const payDrawer=$('payDrawer'), payGrid=$('payGrid'), payHint=$('payHint'), payCancel=$('payCancel'), payConfirm=$('payConfirm');
+  let _pendingPay=null;
+  function openPayDrawer(pid,baseIds,need,poolCards){
+    _pendingPay={pid,baseIds,need,poolIds:poolCards.map(c=>c.id),chosen:new Set()};
+    payHint.textContent=`Select ${need} card${need>1?'s':''} to discard (Page cost).`;
+    payGrid.innerHTML='';
+    poolCards.forEach(c=>{
+      const n=cardNode(c,true);
+      n.onclick=()=>{
+        const chosen=_pendingPay.chosen;
+        if(chosen.has(c.id)){ chosen.delete(c.id); n.classList.remove('selected') }
+        else { chosen.add(c.id); n.classList.add('selected') }
+        payConfirm.disabled=(chosen.size!==need);
+      };
+      payGrid.appendChild(n);
+    });
+    payConfirm.disabled=true; openDrawer(payDrawer);
+  }
+  payCancel.onclick=()=>{ closeDrawer(payDrawer); _pendingPay=null };
+  payConfirm.onclick=()=>{ if(!_pendingPay) return;
+    const {pid,baseIds,chosen}=_pendingPay; const extras=[...chosen];
+    closeDrawer(payDrawer); _pendingPay=null;
+    userAction({type:'CONSTRUCT',pid,ids:baseIds,extras});
+  };
+
+  const giveDrawer=$('giveDrawer'), giveGrid=$('giveGrid'), giveCancel=$('giveCancel');
+  function openGiveDrawer(nineCard){
+    G.chooseGive={nineId:nineCard.id,actorPid:myPid()};
+    giveGrid.innerHTML='';
+    G.players[myPid()].hand.filter(c=>c.id!==nineCard.id).forEach(c=>{
+      const n=cardNode(c,true);
+      n.onclick=()=>{ closeDrawer(giveDrawer); userAction({type:'ACTION_9',pid:myPid(),cardId:nineCard.id,giveId:c.id}); G.chooseGive=null };
+      giveGrid.appendChild(n);
+    });
+    openDrawer(giveDrawer);
+  }
+  giveCancel.onclick=()=>{ closeDrawer(giveDrawer); G.chooseGive=null };
+
+  const aceDrawer=$('aceDrawer'), aceYes=$('aceYes'), aceNo=$('aceNo');
+  function openAceDrawer(){
+    const need=(G.aceQuery?.kind==='ASIG') ? 2 : 1;
+    $('aceYes').disabled=!haveNAces(myPid(),need);
+    openDrawer(aceDrawer);
+    aceDrawer.onfocusin=()=>{ const needNow=(G.aceQuery?.kind==='ASIG') ? 2 : 1; $('aceYes').disabled=!haveNAces(myPid(),needNow) };
+  }
+  function closeAceDrawer(){ closeDrawer(aceDrawer) }
+  aceNo.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery; closeAceDrawer();
+    if(Pref.mode==='online' && Pref.role==='guest'){ sendSig({kind:'ACE_RESPONSE', use:false}); return }
+    G.aceQuery=null; aceResolveNoUse(q.kind,q.actor,q.target,q.info);
+  };
+  aceYes.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery;
+    if(q.kind==='ASIG'){
+      if(haveNAces(myPid(),2)){
+        if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
+        spendNAces(myPid(),2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`); closeAceDrawer(); G.aceQuery=null; return endTurn();
+      } else { closeAceDrawer(); G.aceQuery=null; return }
+    }
+    if(!haveNAces(myPid(),1)){ closeAceDrawer(); G.aceQuery=null; return }
+    if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
+    const roll=1+Math.floor(Math.random()*6);
+    if(roll<=3){
+      log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+      if(q.kind==='A7'){
+        const th=G.players[q.target].hand;
+        if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log(`7: stole a random card.`) }
+        else log('7: defender had no cards.');
+      } else {
+        const th=G.players[q.target].hand;
+        if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log('9: swapped one card.') }
+        else log('9: defender had no cards.');
+        if(q.info?.give) G.players[q.target].hand.push(q.info.give);
+      }
+      closeAceDrawer(); G.aceQuery=null; return endTurn();
+    } else {
+      spendNAces(myPid(),1); G.players[myPid()].score+=1; bumpScore(myPid());
+      if(q.kind==='A9' && q.info?.give) G.discard.push(q.info.give);
+      log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+      closeAceDrawer(); G.aceQuery=null; return endTurn();
+    }
+  };
+
+  // Sigil Drawer
+  const sigilDrawer=$('sigilDrawer'), sigilPoints=$('sigilPoints'), sigilDraw=$('sigilDraw'), sigilCancel=$('sigilCancel');
+  let _pendingSigil=null;
+  function openSigil(c){
+    _pendingSigil=c; $('sigilHint').textContent=`${c.rank}: Points (J+1/Q+2/K+3) or Draw (J/Q +1, K +2)`;
+    openDrawer(sigilDrawer);
+  }
+  sigilPoints.onclick=()=>{const c=_pendingSigil;if(!c)return;closeDrawer(sigilDrawer);userAction({type:'SIGIL',pid:myPid(),rank:c.rank,cardId:c.id,mode:'points'});_pendingSigil=null};
+  sigilDraw.onclick=()=>{const c=_pendingSigil;if(!c)return;closeDrawer(sigilDrawer);userAction({type:'SIGIL',pid:myPid(),rank:c.rank,cardId:c.id,mode:'draw'});_pendingSigil=null};
+  sigilCancel.onclick=()=>{closeDrawer(sigilDrawer);_pendingSigil=null};
+
+  // Settings Drawer
+  const settingsDrawer=$('settingsDrawer');
+  $('btnSettings').onclick=()=>{syncSettingsUI();openDrawer(settingsDrawer)};
+  $('settingsClose').onclick=()=>{closeDrawer(settingsDrawer)};
+  $('resetGame').onclick=()=>{localStorage.removeItem(SAVE_KEY);startNew();toast('Game reset.'); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)}};
+  function syncSettingsUI(){ $('optHaptics').checked=Pref.haptics; $('optAnims').checked=Pref.anims; $('optSwipe').checked=Pref.swipe; $('optCardSize').value=Pref.cardSize; $('optAI').value=Pref.ai; $('optMode').value=Pref.mode; $('optRole').value=Pref.role; $('optRoom').value=Pref.room; $('netStatus').textContent=Net.connected?'Connected':'Offline' }
+  function applySettings(){
+    Pref.haptics=$('optHaptics').checked;
+    Pref.anims=$('optAnims').checked;
+    Pref.swipe=$('optSwipe').checked;
+    Pref.cardSize=$('optCardSize').value;
+    Pref.ai=$('optAI').value;
+    Pref.mode=$('optMode').value;
+    Pref.role=$('optRole').value;
+    Pref.room=$('optRoom').value.trim();
+    savePrefs();
+    adjustCardSize();
+    document.body.classList.toggle('no-anim', !Pref.anims);
+    updateModeTag();
+    updateStartDisabled();
+  }
+  $('optHaptics').onchange=applySettings; $('optAnims').onchange=applySettings; $('optSwipe').onchange=applySettings; $('optCardSize').onchange=applySettings; $('optAI').onchange=applySettings; $('optMode').onchange=applySettings; $('optRole').onchange=applySettings; $('optRoom').onchange=applySettings;
+
+  function adjustCardSize(){
+    const root = document.documentElement;
+    if (Pref.cardSize === 'compact') root.style.setProperty('--cardW', '64px');
+    else if (Pref.cardSize === 'large') root.style.setProperty('--cardW', '92px');
+    else root.style.removeProperty('--cardW'); // auto via CSS clamp
+  }
+
+  function updateModeTag(){
+    $('modeTag').textContent =
+      Pref.mode === 'online'
+        ? (Pref.role.toUpperCase() + ' • ' + (Net.connected ? 'ONLINE' : 'OFFLINE'))
+        : ('SOLO • ' + Pref.ai.toUpperCase());
+  }
+
+  // Route local vs online (guest sends INPUT to host)
+  function userAction(act){
+    if (Pref.mode === 'online' && Pref.role === 'guest' && Net.isOnline()){
+      sendSig({ kind: 'INPUT', act });
+      return;
+    }
+    applyAction(act);
+    if (Net.isOnline() && Pref.role === 'host') sendSync(1);
+  }
+
+  // === UI wiring ===
+  function selectedOne(){
+    const ids=[...G.selected];
+    if (ids.length !== 1) return null;
+    const pid=myPid();
+    return G.players[pid].hand.find(c=>c.id===ids[0]) || null;
+  }
+
+  function playSelectedAction(){
+    const c = selectedOne();
+    if (!c){ log('Select exactly one action card (6/7/9).'); return; }
+    if (c.rank === '6'){ userAction({type:'ACTION_6', pid:myPid(), cardId:c.id}); return; }
+    if (c.rank === '7'){ userAction({type:'ACTION_7', pid:myPid(), cardId:c.id}); return; }
+    if (c.rank === '9'){ openGiveDrawer(c); return; }
+    log('Not an action card.');
+  }
+
+  function playSelectedSigil(){
+    const c = selectedOne();
+    if (!c){ log('Select exactly one Sigil (J/Q/K).'); return; }
+    if (c.rank==='J' || c.rank==='Q' || c.rank==='K'){ openSigil(c); return; }
+    log('Not a Sigil.');
+  }
+
+  function discardSelected(){
+    const c = selectedOne();
+    if (!c){ log('Select exactly one card to discard for +1.'); return; }
+    userAction({type:'DISCARD', pid:myPid(), cardId:c.id});
+  }
+
+  function wireButtons(){
+    // Desktop
+    $('btnStart').onclick = ()=> userAction({type:'START', pid:myPid()});
+    $('btnRules').onclick = ()=> openDrawer($('rulesDrawer'));
+    $('btnConstruct').onclick = ()=>{
+      const act = attemptConstruct(myPid());
+      if (act) userAction(act);
+    };
+    $('btnAction').onclick = playSelectedAction;
+    $('btnSigil').onclick  = playSelectedSigil;
+    $('btnDiscard').onclick= discardSelected;
+
+    // Mobile
+    $('mbStart').onclick = ()=> userAction({type:'START', pid:myPid()});
+    $('mbRules').onclick = ()=> openDrawer($('rulesDrawer'));
+    $('mbConstruct').onclick = ()=>{
+      const act = attemptConstruct(myPid());
+      if (act) userAction(act);
+    };
+    $('mbAction').onclick = playSelectedAction;
+    $('mbSigil').onclick  = playSelectedSigil;
+    $('mbDiscard').onclick= discardSelected;
+
+    // Rules close
+    $('rulesClose').onclick = ()=> closeDrawer($('rulesDrawer'));
+
+    // Network controls
+    const btnConnect = $('btnConnect'), btnDisconnect = $('btnDisconnect');
+    if (btnConnect)   btnConnect.onclick   = ()=>{ applySettings(); Net.connect(); };
+    if (btnDisconnect)btnDisconnect.onclick= ()=> Net.disconnect();
+
+    // Log collapse
+    const toggle = $('toggleLog'), logEl = $('log');
+    if (toggle && logEl){
+      toggle.onclick = ()=>{
+        const collapsed = logEl.classList.toggle('is-collapsed');
+        toggle.textContent = collapsed ? 'Show activity' : 'Hide activity';
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+      };
+    }
+  }
+
+  // === Boot ===
+  (function init(){
+    loadPrefs();
+    // Respect reduced motion on first load
+    if (!Pref.anims) document.body.classList.add('no-anim');
+
+    adjustCardSize();
+    updateModeTag();
+    wireButtons();
+
+    // Load saved game or start fresh UI
+    if (loadState()){
+      render();
+    } else {
+      render(); // empty boards
+    }
+  })();
+
+  </script>
+</body>
+</html>
