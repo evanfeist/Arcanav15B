@@ -911,7 +911,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
           const steal=(roll<=2)?1:(roll<=4)?2:3;
           const give=Math.min(steal,G.players[opp].score);
           G.players[opp].score-=give; G.players[pid].score+=give; bumpScore(pid);
-          log(`♦ d6=${roll} → stole ${give}.`); toast(`<div>♦ Diamonds roll: <span class="die">${roll}</span> → +${give}</div>`);;
+          log(`♦ d6=${roll} → stole ${give}.`); toast(`<div>♦ Diamonds roll: <span class="die">${roll}</span> → +${give}</div>`);
         }
         if(check.suitBonus==='SPADES'){
           const oppH=G.players[opp].hand;
@@ -932,7 +932,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
             if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
             return;
           } else {
-            log(`Clubs extra-turn cap reached (2); passing turn.`);; G.clubChain=0;
+            log(`Clubs extra-turn cap reached (2); passing turn.`); G.clubChain=0;
           }
         }
         G.selected.clear(); endTurn(); return;
@@ -984,7 +984,14 @@ log(`Sigil ${r}: waiting for defender...`); return;
         if(act.mode==='points'){ const add=(r==='J'?1:r==='Q'?2:3); G.players[pid].score+=add; bumpScore(pid); log(`${pid===0?'P1':'P2'} played ${r}: +${add}.`); }
         else { const drawN=(r==='K'?2:1); draw(pid,drawN); log(`${pid===0?'P1':'P2'} played ${r}: draw ${drawN}.`); }
 
-        if(G.players[actor].score>=60){ log(`${actor===0?'P1':'P2'} win (60)!`); ... } buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if (G.players[pid].score >= 60) {
+  log(`${pid===0?'P1':'P2'} win (60)!`);
+  buzz(60);
+  G.started = false;
+  render(); saveState();
+  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
+  return;
+}
         G.selected.clear(); endTurn(); return;
       }
 
@@ -993,7 +1000,14 @@ log(`Sigil ${r}: waiting for defender...`); return;
         if(!c){ log('Invalid discard.'); return }
         G.players[pid].score+=1; bumpScore(pid);
         log(`${pid===0?'P1':'P2'} discarded ${c ? (c.rank + (c.suit||'')) : '—'} for +1.`);
-        if(G.players[pid].score>=60){ if(G.players[actor].score>=60){ log(`${actor===0?'P1':'P2'} win (60)!`); ... } buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if (G.players[pid].score >= 60) {
+  log(`${pid===0?'P1':'P2'} win (60)!`);
+  buzz(60);
+  G.started = false;
+  render(); saveState();
+  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
+  return;
+}
         G.selected.clear(); endTurn(); return;
       }
     }
@@ -1017,7 +1031,14 @@ log(`Sigil ${r}: waiting for defender...`); return;
       const {rank,mode}=info||{};
       if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(`${actor===0?'P1':'P2'} played ${rank}: +${add}.`); }
       else { const drawN=(rank==='K'?2:1); draw(actor,drawN); log(`${actor===0?'P1':'P2'} played ${rank}: draw ${drawN}.`); }
-      if(G.players[pid].score>=60){ log(`${pid===0?'P1':'P2'} win (60)!`); ... } buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+      if (G.players[actor].score >= 60) {
+  log(`${actor===0?'P1':'P2'} win (60)!`);
+  buzz(60);
+  G.started = false;
+  render(); saveState();
+  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
+  return;
+}
       return endTurn();
     }
   }
