@@ -837,13 +837,13 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
 
     res.reason='Not a valid Construct'; return res;
   }
-  function applySuitBonus(res,allow){
-    if(!res.suit || !allow) return;
-    if(res.suit==='♥'){ res.points+=3; res.suitBonus='HEARTS' }
-if(res.suit==='♣'){ res.suitBonus='CLUBS' }
-if(res.suit==='♦'){ res.suitBonus='DIAMONDS' }
-if(res.suit==='♠'){ res.suitBonus='SPADES' }
-  }
+ function applySuitBonus(res, allow){
+  if(!res.suit || !allow) return;
+  if(res.suit==='♥'){ res.points+=3; res.suitBonus='HEARTS'; }
+  if(res.suit==='♣'){ res.suitBonus='CLUBS'; }
+  if(res.suit==='♦'){ res.suitBonus='DIAMONDS'; }
+  if(res.suit==='♠'){ res.suitBonus='SPADES'; }
+}
   function currentSelected(pid){
     const ids=[...G.selected]; return G.players[pid].hand.filter(c=>ids.includes(c.id));
   }
