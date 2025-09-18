@@ -1048,7 +1048,9 @@
       if(!use) return aceResolveNoUse(kind,actor,target,info);
       const roll=1+Math.floor(Math.random()*6);
       if(roll<=3){ log(\`Ace block (d6=\${roll}) → FAIL.\`); toast(\`<div>🂱 Ace roll <span class='die'>\${roll}</span> → fail</div>\`); return aceResolveNoUse(kind,actor,target,info) }
-      else { spendNAces(target,1); G.players[target].score+=1; bumpScore(target); if(kind==='A9'&&info?.give) G.discard.push(info.give); log(\`Ace block (d6=\${roll}) → BLOCKED +1.\`); toast(\`<div>🛡️ Ace roll <span class='die'>\${roll}</span> → block +1</div>\`); return endTurn() }
+      else { spendNAces(target,1); G.players[target].score+=1; bumpScore(target); if (kind === 'A9' && info && info.give) {
+  G.discard.push(info.give);
+} log(\`Ace block (d6=\${roll}) → BLOCKED +1.\`); toast(\`<div>🛡️ Ace roll <span class='die'>\${roll}</span> → block +1</div>\`); return endTurn() }
     }
   }
 
