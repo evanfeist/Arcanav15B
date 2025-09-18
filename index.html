@@ -776,7 +776,7 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     if(G.started && Pref.mode==='solo' && G.turn===1) setTimeout(aiTakeTurn,380);
     if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
   }
-  function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(\`\${pid===0?'P1':'P2'} drew 3 (safety).\`); render() } }
+  function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(`${pid===0?'P1':'P2'} drew 3 (safety).`); render() } }
 
   function validateConstruct(cards){
     const res={valid:false,kind:'',points:0,suit:null,jokersUsed:0,suitBonus:null,reason:''};
@@ -891,7 +891,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
         }
         G.players[pid].score+=check.points; bumpScore(pid);
         G.discard.push(...cards);
-        log(\`\${pid===0?'P1':'P2'} played \${check.kind} for +\${check.points}.\`); buzz(20);
+        log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`); buzz(20);
 
         if(check.kind==='PAGE_ONLY'){
           if (check.bonus && check.bonus.draw) {
@@ -911,28 +911,28 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
           const steal=(roll<=2)?1:(roll<=4)?2:3;
           const give=Math.min(steal,G.players[opp].score);
           G.players[opp].score-=give; G.players[pid].score+=give; bumpScore(pid);
-          log(\`♦ d6=\${roll} → stole \${give}.\`); toast(\`<div>♦ Diamonds roll: <span class="die">\${roll}</span> → +\${give}</div>\`);
+          log(`♦ d6=${roll} → stole ${give}.`); toast(`<div>♦ Diamonds roll: <span class="die">${roll}</span> → +${give}</div>`);;
         }
         if(check.suitBonus==='SPADES'){
           const oppH=G.players[opp].hand;
           for(let i=0;i<2 && oppH.length>0;i++){ const j=rnd(oppH.length); const c=oppH.splice(j,1)[0]; G.players[pid].hand.push(c) }
-          log(\`♠ stole up to 2 random card(s).\`); toast(`<div>♠ Stole up to 2 random cards</div>`);
+          log(`♠ stole up to 2 random card(s).`); toast(`<div>♠ Stole up to 2 random cards</div>`);
         }
 
         const extraTurn=(check.suitBonus==='CLUBS');
-        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if(G.players[pid].score>=60){ log(`${pid===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
 
         if(extraTurn){
           endOfTurnDraw(pid);
           G.clubChain=(G.turn===pid ? G.clubChain+1 : 1);
           if(G.clubChain<=2){
-            log(\`\${pid===0?'P1':'P2'} take an extra turn (\${G.clubChain}/2).\`);
+            log(`${pid===0?'P1':'P2'} take an extra turn (${G.clubChain}/2).`);
             render(); maybeSafetyDraw(); saveState();
             if(Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn,380);
             if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
             return;
           } else {
-            log(\`Clubs extra-turn cap reached (2); passing turn.\`); G.clubChain=0;
+            log(`Clubs extra-turn cap reached (2); passing turn.`);; G.clubChain=0;
           }
         }
         G.selected.clear(); endTurn(); return;
@@ -941,7 +941,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
       case 'ACTION_6': {
         const c=discardFromHandById(pid,act.cardId);
         if(!c){ log('6: invalid card.'); return }
-        draw(pid,2); log(\`\${pid===0?'P1':'P2'} played 6 (Draw2).\`); G.selected.clear(); endTurn(); return;
+        draw(pid,2); log(`${pid===0?'P1':'P2'} played 6 (Draw2).`); G.selected.clear(); endTurn(); return;
       }
 
       case 'ACTION_7': {
@@ -969,11 +969,11 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
         if(aceCount>=2){
           if(Net.isOnline() && Pref.role==='host' && target===1){
             G.aceQuery={kind:'ASIG',actor:pid,target,info:{rank:r,mode:act.mode}};
-            sendSig({kind:'ACE_PROMPT', data:{kind:'ASIG', rank:r, mode:act.mode}});
-            log(\`Sigil \${r}: waiting for defender...\`); return;
+sendSig({kind:'ACE_PROMPT', data:{kind:'ASIG', rank:r, mode:act.mode}});
+log(`Sigil ${r}: waiting for defender...`); return;
           }
           if(target===1 && Pref.mode==='solo'){
-            spendNAces(target,2); log(\`Sigil blocked by 2 Aces → Sigil discarded.\`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`); endTurn(); return;
+            spendNAces(target,2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`); endTurn(); return;
           }
           if(target===0){
             G.aceQuery={kind:'ASIG',actor:pid,target,info:{rank:r,mode:act.mode}};
@@ -981,10 +981,10 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
           }
         }
 
-        if(act.mode==='points'){ const add=(r==='J'?1:r==='Q'?2:3); G.players[pid].score+=add; bumpScore(pid); log(\`\${pid===0?'P1':'P2'} played \${r}: +\${add}.\`) }
-        else { const drawN=(r==='K'?2:1); draw(pid,drawN); log(\`\${pid===0?'P1':'P2'} played \${r}: draw \${drawN}.\`) }
+        if(act.mode==='points'){ const add=(r==='J'?1:r==='Q'?2:3); G.players[pid].score+=add; bumpScore(pid); log(`${pid===0?'P1':'P2'} played ${r}: +${add}.`); }
+        else { const drawN=(r==='K'?2:1); draw(pid,drawN); log(`${pid===0?'P1':'P2'} played ${r}: draw ${drawN}.`); }
 
-        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if(G.players[pid].score>=60){ log(`\${pid===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
         G.selected.clear(); endTurn(); return;
       }
 
@@ -993,7 +993,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
         if(!c){ log('Invalid discard.'); return }
         G.players[pid].score+=1; bumpScore(pid);
         log(`${pid===0?'P1':'P2'} discarded ${c ? (c.rank + (c.suit||'')) : '—'} for +1.`);
-        if(G.players[pid].score>=60){ log(\`\${pid===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if(G.players[pid].score>=60){ log(`\${pid===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
         G.selected.clear(); endTurn(); return;
       }
     }
@@ -1015,9 +1015,9 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
     }
     if(kind==='ASIG'){
       const {rank,mode}=info||{};
-      if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(\`\${actor===0?'P1':'P2'} played \${rank}: +\${add}.\`) }
+      if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(`\${actor===0?'P1':'P2'} played \${rank}: +\${add}.`) }
       else { const drawN=(rank==='K'?2:1); draw(actor,drawN); log(\`\${actor===0?'P1':'P2'} played \${rank}: draw \${drawN}.\`) }
-      if(G.players[actor].score>=60){ log(\`\${actor===0?'P1':'P2'} win (60)!\`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+      if(G.players[actor].score>=60){ log(`\${actor===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
       return endTurn();
     }
   }
@@ -1042,10 +1042,12 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
       const use=aiWantsAce(target);
       if(!use) return aceResolveNoUse(kind,actor,target,info);
       const roll=1+Math.floor(Math.random()*6);
-      if(roll<=3){ log(\`Ace block (d6=\${roll}) → FAIL.\`); toast(\`<div>🂱 Ace roll <span class='die'>\${roll}</span> → fail</div>\`); return aceResolveNoUse(kind,actor,target,info) }
+      if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`);
+toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); return aceResolveNoUse(kind,actor,target,info) }
       else { spendNAces(target,1); G.players[target].score+=1; bumpScore(target); if (kind === 'A9' && info && info.give) {
   G.discard.push(info.give);
-} log(\`Ace block (d6=\${roll}) → BLOCKED +1.\`); toast(\`<div>🛡️ Ace roll <span class='die'>\${roll}</span> → block +1</div>\`); return endTurn() }
+} log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`); return endTurn() }
     }
   }
 
