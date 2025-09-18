@@ -444,6 +444,8 @@
 
   <!-- === GAME LOGIC + ONLINE SYNC === -->
   <script>
+    "use strict";
+    
   const $ = (id)=>document.getElementById(id);
   const SUITS=['♠','♥','♦','♣']
   const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
@@ -708,7 +710,7 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     const t=typeOf(c);
 
     if(show){
-      d.style.backgroundImage=\`url("\${imgPath(c)}")\`;
+      d.style.backgroundImage=`url("${imgPath(c)}")`;
 
       if(!isPage(c)){
         const chip=document.createElement('div');
@@ -725,11 +727,11 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
       // Accessible name & state
       const suitWord = isPage(c) ? '' : suitSlug(c.suit);
       d.setAttribute('role','button');
-      d.setAttribute('aria-label', isPage(c) ? 'Page (Joker)' : \`\${c.rank} of \${suitWord}\`);
+      d.setAttribute('aria-label', isPage(c) ? 'Page (Joker)' : `${c.rank} of ${suitWord}`);
       d.setAttribute('aria-pressed', G.selected.has(c.id)?'true':'false');
     } else {
       d.classList.add('back');
-      d.style.backgroundImage=\`url("\${IMG_BASE}back\${EXT}")\`;
+      d.style.backgroundImage=`url("${IMG_BASE}back${EXT}")`;
       d.setAttribute('aria-hidden','true');
     }
     return d;
@@ -975,7 +977,7 @@ if(res.suit==='♠'){ res.suitBonus='SPADES' }
           }
           if(target===0){
             G.aceQuery={kind:'ASIG',actor:pid,target,info:{rank:r,mode:act.mode}};
-            $('acePrompt').textContent=\`Opponent played \${r}. Discard 2 Aces to block?\`; openAceDrawer(); return;
+            $('acePrompt').textContent=`Opponent played ${r}. Discard 2 Aces to block?`; openAceDrawer(); return;
           }
         }
 
