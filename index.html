@@ -1088,7 +1088,7 @@
     const pool=G.players[pid].hand.filter(c=>c.id!==nineId).slice();
     const val=(c)=> isPage(c)?100 : c.rank==='A'?90 : c.rank==='K'?80 : c.rank==='Q'?75 : c.rank==='J'?70 : c.rank==='9'?60 : c.rank==='7'?55 : c.rank==='6'?50 : RVAL(c.rank);
     if(Pref.ai==='expert'){ pool.sort((a,b)=>val(a)-val(b)); return pool[0] ? pool[0].id : undefined }
-    pool.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return pool[0]?.id;
+    pool.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return pool[0] ? pool[0].id : undefined;
   }
   function aiWantsAce(pid){
     const me=G.players[pid], opp=G.players[1-pid];
@@ -1253,7 +1253,9 @@
         const th=G.players[q.target].hand;
         if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log('9: swapped one card.') }
         else log('9: defender had no cards.');
-        if(q.info?.give) G.players[q.target].hand.push(q.info.give);
+        if (q.info && q.info.give) {
+  G.players[q.target].hand.push(q.info.give);
+}
       }
       closeAceDrawer(); G.aceQuery=null; return endTurn();
     } else {
