@@ -488,7 +488,8 @@
   function loadPrefs(){try{const p=JSON.parse(localStorage.getItem(PREF_KEY)); if(p) Object.assign(Pref,p);}catch{}}
   function savePrefs(){try{localStorage.setItem(PREF_KEY,JSON.stringify(Pref));}catch{}}
 
-  const PREFERS_REDUCED_MOTION=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const PREFERS_REDUCED_MOTION =
+  !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   function buzz(ms=20){try{ if(PREFERS_REDUCED_MOTION) return; Pref.haptics && navigator.vibrate && navigator.vibrate(ms);}catch{}}
 
   // Toasts (with cap)
@@ -719,7 +720,7 @@
       if(!isPage(c)){
         const chip=document.createElement('div');
         chip.className='rank';
-        chip.textContent=\`\${c.rank ?? ''}\${suitGlyph(c.suit || '')}\`;
+        chip.textContent = (c.rank != null ? c.rank : '') + suitGlyph(c.suit || '');
         d.appendChild(chip);
       }
       if(t==='Page'){
@@ -898,8 +899,17 @@
         log(\`\${pid===0?'P1':'P2'} played \${check.kind} for +\${check.points}.\`); buzz(20);
 
         if(check.kind==='PAGE_ONLY'){
-          if(check.bonus?.draw){ draw(pid,check.bonus.draw); log(\`Drew \${check.bonus.draw}.\`) }
-          if(check.bonus?.refill){ const need=Math.max(0,7-G.players[pid].hand.length); if(need>0){ draw(pid,need); log('Refilled to 7.') } }
+          if (check.bonus && check.bonus.draw) {
+  draw(pid, check.bonus.draw);
+  log(`Drew ${check.bonus.draw}.`);
+}
+          if (check.bonus && check.bonus.refill) {
+  const need = Math.max(0, 7 - G.players[pid].hand.length);
+  if (need > 0) {
+    draw(pid, need);
+    log('Refilled to 7.');
+  }
+}
         }
         if(check.suitBonus==='DIAMONDS'){
           const roll=1+Math.floor(Math.random()*6);
@@ -1208,10 +1218,13 @@
 
   const aceDrawer=$('aceDrawer'), aceYes=$('aceYes'), aceNo=$('aceNo');
   function openAceDrawer(){
-    const need=(G.aceQuery?.kind==='ASIG') ? 2 : 1;
+    const need = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
     $('aceYes').disabled=!haveNAces(myPid(),need);
     openDrawer(aceDrawer);
-    aceDrawer.onfocusin=()=>{ const needNow=(G.aceQuery?.kind==='ASIG') ? 2 : 1; $('aceYes').disabled=!haveNAces(myPid(),needNow) };
+    aceDrawer.onfocusin = () => {
+  const needNow = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
+  $('aceYes').disabled = !haveNAces(myPid(), needNow);
+};
   }
   function closeAceDrawer(){ closeDrawer(aceDrawer) }
   aceNo.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery; closeAceDrawer();
@@ -1243,7 +1256,7 @@
       closeAceDrawer(); G.aceQuery=null; return endTurn();
     } else {
       spendNAces(myPid(),1); G.players[myPid()].score+=1; bumpScore(myPid());
-      if(q.kind==='A9' && q.info?.give) G.discard.push(q.info.give);
+      if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
       log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
       closeAceDrawer(); G.aceQuery=null; return endTurn();
     }
