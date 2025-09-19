@@ -1165,7 +1165,7 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
   function aiBestConstruct(pid){
     const hand=G.players[pid].hand; let best=null,bestPts=-999;
     const ids=hand.map(c=>c.id);
-    cconst cap = (
+    const cap = (
   Pref.ai === 'easy'   ? 120  :
   Pref.ai === 'normal' ? 250  :
   Pref.ai === 'hard'   ? 1200 : 
@@ -1178,6 +1178,39 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
         const check=validateConstruct(cards);
         if(!check.valid) continue;
         let score=check.points;
+// Heuristic upgrades for stronger difficulties
+if (Pref.ai === 'hard' || Pref.ai === 'expert') {
+  const usesJokers = cards.some(isPage);
+  const usesPower  = cards.some(c => c.rank==='A' || isJQK(c.rank) || c.rank==='6' || c.rank==='7' || c.rank==='9');
+
+  if (Pref.ai === 'hard') {
+    if (usesJokers) score -= 0.5 * check.jokersUsed;
+    if (usesPower)  score -= 0.2;
+    if (check.suitBonus === 'HEARTS')   score += 0.6;
+    if (check.suitBonus === 'DIAMONDS') score += 1.0;
+    if (check.suitBonus === 'SPADES')   score += 0.8;
+    if (check.suitBonus === 'CLUBS')    score += 1.5;
+  }
+
+  if (Pref.ai === 'expert') {
+    if (check.suitBonus === 'CLUBS')    score += 6.0;   // extra turn chaining is huge
+    if (check.suitBonus === 'DIAMONDS') score += 4.5;
+    if (check.suitBonus === 'SPADES')   score += 3.2;
+    if (check.suitBonus === 'HEARTS')   score += 2.0;
+
+    if (usesJokers) score -= Math.max(1.0, 0.8 * check.jokersUsed);
+    if (usesPower)  score -= 0.8;       // avoid burning action/defense pieces inside constructs
+
+    score += 0.15 * cards.length;       // tiny preference for bigger melds
+
+    const me = G.players[pid];
+    const after = me.score + check.points;
+    if (after >= 60) score += 8;        // winning lines get a big bump
+    if (check.suitBonus === 'CLUBS' && (G.turn === pid) && (G.clubChain < 2)) {
+      score += 2.5;                     // maintain club chains if possible
+    }
+  }
+}
         if(score>bestPts){
           bestPts=score; best={ids:set.slice(),info:check,extras:[]};
           if(check.jokersUsed>0 && check.kind!=='PAGE_ONLY'){
@@ -1192,54 +1225,56 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
     return best;
   }
   function aiTakeTurn(){
-    if(!G.started||G.turn!==1) return;
-    const pid=1;
-    const best=aiBestConstruct(pid); if(best){ applyAction({type:'CONSTRUCT',pid,ids:best.ids,extras:best.extras||[],info:best.info}); return }
-    const sig=aiPickSigil(pid); if(sig){ applyAction({type:'SIGIL',pid,rank:sig.rank,cardId:sig.id,mode:sig.mode}); return }
-    const a7=aiFind(pid,'7'); if(a7 && G.players[0].hand.length>0){ applyAction({type:'ACTION_7',pid,cardId:a7.id}); return }
-    const a9=aiFind(pid,'9'); if(a9 && G.players[0].hand.length>0){ const giveId=aiChooseGive(pid,a9.id); applyAction({type:'ACTION_9',pid,cardId:a9.id,giveId}); return }
-    const a6=aiFind(pid,'6'); if(best){
-  applyAction({type:'CONSTRUCT',pid,ids:best.ids,extras:best.extras||[],info:best.info});
-  return;
-}
+  if(!G.started || G.turn!==1) return;
+  const pid=1;
 
-// EXPERT presses with 7/9 based on board state BEFORE sigils
-if (Pref.ai==='expert'){
-  if (a7 && G.players[0].hand.length > G.players[1].hand.length){
-    applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
+  const best = aiBestConstruct(pid);
+  const sig  = aiPickSigil(pid);
+  const a7   = aiFind(pid,'7');
+  const a9   = aiFind(pid,'9');
+  const a6   = aiFind(pid,'6');
+
+  // 1) If we have a strong construct, do it first
+  if(best){
+    applyAction({type:'CONSTRUCT',pid,ids:best.ids,extras:best.extras||[],info:best.info});
+    return;
   }
-  if (a9){
-    const giveId=aiChooseGive(pid,a9.id);
-    // If we're tied/ahead in points, swap aggressively to disrupt
-    if (G.players[pid].score >= G.players[1-pid].score){
-      applyAction({type:'ACTION_9', pid, cardId:a9.id, giveId}); return;
+
+  // 2) EXPERT: press with 7/9 before sigils if the board suggests disruption
+  if (Pref.ai==='expert'){
+    if (a7 && G.players[0].hand.length > G.players[1].hand.length){
+      applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
+    }
+    if (a9){
+      const giveId=aiChooseGive(pid,a9.id);
+      if (G.players[pid].score >= G.players[1-pid].score){
+        applyAction({type:'ACTION_9', pid, cardId:a9.id, giveId}); return;
+      }
     }
   }
-}
 
-// HARD is a bit more willing to use 7 when behind
-if (Pref.ai==='hard'){
-  if (a7 && G.players[pid].score < G.players[1-pid].score){
-    applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
+  // 3) HARD: more willing to use 7 when behind
+  if (Pref.ai==='hard'){
+    if (a7 && G.players[pid].score < G.players[1-pid].score){
+      applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
+    }
   }
-}
 
-// Sigil next (can still be lethal or tempo)
-if(sig){
-  applyAction({type:'SIGIL',pid,rank:sig.rank,cardId:sig.id,mode:sig.mode});
-  return;
-}
-
-// Draw 2 if we’re low on gas
-if (a6 && G.players[pid].hand.length<=5){
-  applyAction({type:'ACTION_6', pid, cardId:a6.id}); return;
-}
-
-// Fallback: discard least-useful card (with synergy-aware picker)
-const toss=aiPickTrash(pid);
-applyAction({type:'DISCARD', pid, cardId:toss.id});
-return;
+  // 4) If a Sigil is available, use it (can be lethal or tempo)
+  if(sig){
+    applyAction({type:'SIGIL',pid,rank:sig.rank,cardId:sig.id,mode:sig.mode});
+    return;
   }
+
+  // 5) Gas up if we're low
+  if (a6 && G.players[pid].hand.length<=5){
+    applyAction({type:'ACTION_6', pid, cardId:a6.id}); return;
+  }
+
+  // 6) Fallback: discard least-useful card (synergy-aware)
+  const toss=aiPickTrash(pid);
+  applyAction({type:'DISCARD', pid, cardId:toss.id});
+}
 
   // Online messages
   function onSignal(p){
