@@ -139,6 +139,47 @@
     .toast.anim-in { animation:toastIn .22s ease }
     #log .line.anim-flash { animation:flash .6s ease }
 
+/* Suit-bonus banner */
+#bannerHost{
+  position:fixed; left:50%; transform:translateX(-50%);
+  top:14px; z-index:95; display:flex; flex-direction:column; gap:10px;
+}
+.banner{
+  background:#0f1826; border:1px solid var(--border);
+  padding:12px 16px; border-radius:14px; min-width:280px;
+  text-align:center; font-weight:700; letter-spacing:.3px;
+  box-shadow:var(--shadow); opacity:1; animation:bannerIn .28s ease;
+}
+.banner .big{ font-size:18px; margin-bottom:2px }
+.banner .sub{ font-size:12px; color:var(--sub) }
+.banner.club { border-color:#2d5a2d; background:#0f1f12 }
+.banner.diamond { border-color:#6a4a0e; background:#1f160a }
+.banner.spade { border-color:#2b3550; background:#0d1320 }
+.banner.heart { border-color:#613344; background:#1a0f15 }
+@keyframes bannerIn { from{transform:translate(-50%,-8px); opacity:0} to{transform:translate(-50%,0); opacity:1} }
+
+/* Tutorial overlay */
+#tutorialDrawer .step{ display:none }
+#tutorialDrawer .step.active{ display:block }
+#tutorialDots{ display:flex; gap:6px; align-items:center }
+#tutorialDots .dot{
+  width:8px; height:8px; border-radius:999px; background:#263243; border:1px solid var(--border)
+}
+#tutorialDots .dot.on{ background:#6cc4ff; }
+    <button id="btnTutorial" class="btn-accent">❔ Tutorial</button>
+
+    /* Card rank tooltips */
+.card .rank[data-tip]{ position:relative; cursor:help }
+.card .rank[data-tip]:focus::after,
+.card .rank[data-tip]:hover::after{
+  content: attr(data-tip);
+  position:absolute; left:0; bottom:120%;
+  background:#0f1826; color:var(--ink);
+  border:1px solid var(--border); border-radius:8px;
+  padding:6px 8px; font-size:11px; white-space:nowrap; z-index:10;
+  box-shadow:var(--shadow);
+}
+    
     /* iOS bottom padding guard */
     @supports(padding:max(0px)) {
       .tabbar { padding-bottom: max(12px, var(--safe-bottom)); }
@@ -193,6 +234,16 @@
       <div id="aiHand" class="hand"></div>
     </div>
 
+<div id="constructPreview" aria-live="polite">
+  <div class="left">
+    <span id="previewKind" class="pill">—</span>
+    <span id="previewPoints" class="preview-good">—</span>
+    <span id="previewExtras" class="pill" style="display:none"></span>
+    <span id="previewWhy" class="preview-bad" style="display:none"></span>
+  </div>
+  <button id="previewPlay" class="btn-ok" style="display:none">Play Construct</button>
+</div>
+    
     <!-- Right column: Log -->
     <div class="col">
       <header class="sticky bar">
@@ -294,6 +345,42 @@
                 <li><strong>True Pair</strong> (same rank + same suit): <strong>5</strong> pts</li>
               </ul>
             </div>
+<div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true" role="dialog">
+  <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
+    <h3 style="margin:0">How to Play</h3>
+    <div id="tutorialDots" aria-hidden="true">
+      <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <button id="tutorialClose" aria-label="Close tutorial">Close</button>
+  </header>
+  <div class="body" style="font-size:14px;color:var(--sub)">
+    <div class="step active">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">1) Build Constructs for points</h4>
+      <p>Make Pairs, Sets, or Runs. Pages (Jokers) can help, but may cost points and extra discards.</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">2) Actions (6/7/9)</h4>
+      <p>6 draws 2. 7 steals 1 (Ace can try to block). 9 swaps a card (Ace can try to block).</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">3) Sigils (J/Q/K)</h4>
+      <p>Choose Points (J+1/Q+2/K+3) or Draw (J/Q +1, K +2). Opponent can auto-block by discarding 2 Aces.</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">4) Suit bonuses</h4>
+      <p>Constructs with one suit (no Pages) gain bonuses: ♥ +3 • ♣ extra turn • ♦ steal points • ♠ steal up to 2 cards.</p>
+    </div>
+    <div class="panel" style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
+      <label style="display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="tutorialDontShow"> Don’t show again
+      </label>
+      <div style="display:flex;gap:8px">
+        <button id="tutorialPrev">Back</button>
+        <button id="tutorialNext" class="btn-ok">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
             <div>
               <strong>Sets</strong> (3+ of the same rank)
               <ul style="margin:4px 0 0 1rem;padding:0">
@@ -442,6 +529,8 @@
   <!-- Toast region -->
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+<div id="bannerHost" aria-live="polite" aria-atomic="true"></div>
+  
   <!-- === GAME LOGIC + ONLINE SYNC === -->
   <script>
     "use strict";
@@ -504,7 +593,21 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     host.appendChild(t);
     setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),320);},ms);
   }
-
+function banner(html, cls='', ms=2200){
+  const host = $('bannerHost');
+  const b = document.createElement('div');
+  b.className = `banner ${cls}`;
+  b.innerHTML = html;
+  host.appendChild(b);
+  setTimeout(()=>{ b.style.opacity='0'; b.style.transition='opacity .25s';
+    setTimeout(()=>b.remove(), 300);
+  }, ms);
+}
+function suitBanner(suit, extra=''){
+  const map = { '♥':['heart','♥ Hearts +3'], '♣':['club','♣ Extra turn'], '♦':['diamond','♦ Steal points'], '♠':['spade','♠ Steal up to 2 cards'] };
+  const [cls, title] = map[suit] || ['','Suit bonus'];
+  banner(`<div class="big">${title}</div><div class="sub">${extra}</div>`, cls);
+}
   // Anim helpers
   function addAnim(el,cls,ms=400){
     if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
@@ -681,7 +784,7 @@ function ensureMyTurnUI(){
     $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
     $('turnTag').textContent=G.started?(G.turn===myPid()?'Your turn':(Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn'))):'—';
     $('modeTag').textContent = Pref.mode==='online' ? (Pref.role.toUpperCase() + ' • ' + (Net.connected?'ONLINE':'OFFLINE')) : ('SOLO • ' + Pref.ai.toUpperCase());
-
+updateConstructPreview();
     const yh=$('yourHand'), ah=$('aiHand'); yh.innerHTML=''; ah.innerHTML='';
     // Your hand (fronts)
     G.players[myPid()].hand.forEach((c)=>{
@@ -738,11 +841,13 @@ updateStartDisabled();
       d.style.backgroundImage=`url("${imgPath(c)}")`;
 
       if(!isPage(c)){
-        const chip=document.createElement('div');
-        chip.className='rank';
-        chip.textContent = (c.rank ?? '') + (c.suit ?? '');
-        d.appendChild(chip);
-      }
+  const chip=document.createElement('div');
+  chip.className='rank';
+  chip.textContent = (c.rank ?? '') + (c.suit ?? '');
+  chip.setAttribute('data-tip', rankTip(c));
+  chip.tabIndex = 0; // focus = tooltip on keyboard
+  d.appendChild(chip);
+}
       if(t==='Page'){
         const tag=document.createElement('div');
         tag.className='tag';
@@ -767,7 +872,8 @@ updateStartDisabled();
     const on=G.selected.has(id);
     if(on){ G.selected.delete(id); node.classList.remove('selected'); node.setAttribute('aria-pressed','false') }
     else { G.selected.add(id); node.classList.add('selected'); node.setAttribute('aria-pressed','true') }
-  }
+updateConstructPreview();  
+}
   function typeOf(c){
     if(isPage(c)) return 'Page';
     if(isJQK(c.rank)) return 'Sigil';
@@ -911,39 +1017,6 @@ if (cards.length >= 3 && sameSuit) {
       res.points-=pages.length; return res;
     }
 
-    // Ace-aware RUN: try Ace low (1) and Ace high (14) and pick the cheaper (fewest gaps)
-if (sameSuit && cards.length >= 3) {
-  const aceHighVals = non.map(c => (c.rank === 'A' ? 14 : RVAL(c.rank)));
-  const aceLowVals  = non.map(c => RVAL(c.rank)); // A = 1
-
-  function analyze(vals){
-    const arr = vals.slice().sort((a,b)=>a-b);
-    for (let i=1;i<arr.length;i++){
-      if (arr[i] === arr[i-1]) return {ok:false, gaps:1e9}; // duplicate ranks kill the run
-    }
-    let gaps = 0;
-    for (let i=1;i<arr.length;i++){
-      const diff = arr[i] - arr[i-1];
-      if (diff <= 0) return {ok:false, gaps:1e9};
-      gaps += (diff - 1);
-    }
-    return {ok:true, gaps};
-  }
-
-  const A = analyze(aceLowVals);
-  const B = analyze(aceHighVals);
-  const best = (B.gaps < A.gaps ? B : A);
-
-  if (best.ok && best.gaps <= pages.length) {
-    const sum = non.reduce((s,c)=> s + RVAL(c.rank), 0); // scoring still uses A=1
-    res.valid = true;
-    res.kind = 'RUN';
-    res.points = sum + cards.length;
-    if (pages.length === 0) applySuitBonus(res, true);
-    else res.points -= pages.length;
-    return res;
-  }
-}
 
     res.reason='Not a valid Construct'; return res;
   }
@@ -978,7 +1051,56 @@ if (sameSuit && cards.length >= 3) {
     }
     return {type:'CONSTRUCT',pid,ids:cards.map(c=>c.id),extras:[],info:check};
   }
+function updateConstructPreview(){
+  const host = $('constructPreview');
+  const kindEl = $('previewKind'), ptsEl = $('previewPoints');
+  const extraEl = $('previewExtras'), whyEl = $('previewWhy');
+  const btn = $('previewPlay');
 
+  const pid = myPid();
+  const cards = currentSelected(pid);
+
+  // reset UI
+  host.style.display = 'none';
+  btn.style.display = 'none';
+  extraEl.style.display = 'none';
+  whyEl.style.display = 'none';
+  document.querySelectorAll('.card.selected').forEach(n=>n.classList.remove('preview-glow'));
+
+  if (!cards || cards.length < 2) return;
+
+  const res = validateConstruct(cards);
+
+  host.style.display = 'flex';
+  if (res.valid){
+    kindEl.textContent = res.kind.replace('_',' ');
+    let note = `+${res.points}`;
+    if (res.suitBonus==='HEARTS')   note += ' (♥ +3)';
+    if (res.suitBonus==='CLUBS')    note += ' (♣ extra turn)';
+    if (res.suitBonus==='DIAMONDS') note += ' (♦ steal)';
+    if (res.suitBonus==='SPADES')   note += ' (♠ steal cards)';
+    ptsEl.textContent = note;
+    ptsEl.classList.remove('preview-bad'); ptsEl.classList.add('preview-good');
+
+    if (res.jokersUsed>0 && res.kind!=='PAGE_ONLY'){
+      extraEl.style.display = 'inline-block';
+      extraEl.textContent = `Pay Page cost: discard ${res.jokersUsed}`;
+    }
+
+    // glow selected
+    $('yourHand').querySelectorAll('.card.selected').forEach(n=>n.classList.add('preview-glow'));
+    btn.style.display = (G.turn===pid) ? 'inline-block' : 'none';
+  } else {
+    kindEl.textContent = 'Not a construct';
+    ptsEl.textContent = '—';
+    ptsEl.classList.remove('preview-good'); ptsEl.classList.add('preview-bad');
+    whyEl.style.display = 'inline'; whyEl.textContent = res.reason || 'Invalid';
+  }
+}
+$('previewPlay').onclick = ()=>{
+  const act = attemptConstruct(myPid());
+  if (act) userAction(act);
+};
   // LOG
   function log(s){
     const el=$('log'); if(el){ const d=document.createElement('div'); d.className='line'; d.textContent=s; el.appendChild(d); el.scrollTop=el.scrollHeight; flashLogLast() }
@@ -1009,6 +1131,11 @@ if (check.suitBonus === 'CLUBS')    log('♣ bonus: extra turn.');
 if (check.suitBonus === 'DIAMONDS') log('♦ bonus: steal points.');
 if (check.suitBonus === 'SPADES')   log('♠ bonus: steal up to 2 cards.');
 
+if (check.suitBonus === 'HEARTS')  suitBanner('♥', '+3 points');
+if (check.suitBonus === 'CLUBS')   suitBanner('♣', 'Take another turn (cap 2)');
+if (check.suitBonus === 'DIAMONDS') suitBanner('♦', 'Roll d6 to steal 1–3');
+if (check.suitBonus === 'SPADES')  suitBanner('♠', 'Steal up to 2 random cards');
+        
         if(check.kind==='PAGE_ONLY'){
           if (check.bonus && check.bonus.draw) {
   draw(pid, check.bonus.draw);
@@ -1670,6 +1797,41 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
   $('btnSettings').onclick=()=>{syncSettingsUI();openDrawer(settingsDrawer)};
   $('settingsClose').onclick=()=>{closeDrawer(settingsDrawer)};
   $('resetGame').onclick=()=>{localStorage.removeItem(SAVE_KEY);startNew();toast('Game reset.'); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)}};
+    // ---- Tutorial wiring (simple) ----
+const TUTO_KEY = 'arcana_tutorial_seen_v1';
+
+function updateTutorialDots(i){
+  const dots = $('tutorialDots').querySelectorAll('.dot');
+  dots.forEach((d,idx)=> d.classList.toggle('on', idx===i));
+}
+
+$('tutorialNext').onclick = ()=>{
+  const steps = Array.from($('tutorialDrawer').querySelectorAll('.step'));
+  let i = steps.findIndex(s=> s.classList.contains('active'));
+  if (i < steps.length-1){
+    steps[i].classList.remove('active');
+    steps[i+1].classList.add('active');
+    updateTutorialDots(i+1);
+  } else {
+    if ($('tutorialDontShow').checked) localStorage.setItem(TUTO_KEY, '1');
+    closeDrawer($('tutorialDrawer'));
+  }
+};
+
+$('tutorialPrev').onclick = ()=>{
+  const steps = Array.from($('tutorialDrawer').querySelectorAll('.step'));
+  let i = steps.findIndex(s=> s.classList.contains('active'));
+  if (i > 0){
+    steps[i].classList.remove('active');
+    steps[i-1].classList.add('active');
+    updateTutorialDots(i-1);
+  }
+};
+
+$('tutorialClose').onclick = ()=>{
+  if ($('tutorialDontShow').checked) localStorage.setItem(TUTO_KEY, '1');
+  closeDrawer($('tutorialDrawer'));
+};
   function syncSettingsUI(){ $('optHaptics').checked=Pref.haptics; $('optAnims').checked=Pref.anims; $('optSwipe').checked=Pref.swipe; $('optCardSize').value=Pref.cardSize; $('optAI').value=Pref.ai; $('optMode').value=Pref.mode; $('optRole').value=Pref.role; $('optRoom').value=Pref.room; $('netStatus').textContent=Net.connected?'Connected':'Offline' }
   function applySettings(){
     Pref.haptics=$('optHaptics').checked;
@@ -1764,6 +1926,8 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
   }
 
   function wireButtons(){
+const tbtn = $('btnTutorial');
+if (tbtn) tbtn.onclick = ()=> openDrawer($('tutorialDrawer'));
     // Desktop
     $('btnStart').onclick = ()=> userAction({type:'START', pid:myPid()});
     $('btnRules').onclick = ()=> openDrawer($('rulesDrawer'));
@@ -1821,8 +1985,40 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
     } else {
       render(); // empty boards
     }
-  })();
+// Auto-open tutorial the first time
+if (!localStorage.getItem(TUTO_KEY)) {
+  setTimeout(()=> openDrawer($('tutorialDrawer')), 400);
+}  })();
 
+function rankTip(c){
+  const r = c.rank;
+  if (isPage(c)) return 'Page (Joker): wild; costs 1 extra discard and −1 point when used in non-Page melds.';
+  if (r==='A') return 'Ace: try to block 7/9 (d6: 4–6 blocks +1); discard 2 to auto-block a Sigil.';
+  if (r==='6') return 'Action 6: Draw 2.';
+  if (r==='7') return 'Action 7: Steal 1 random card (Ace can try to block).';
+  if (r==='9') return 'Action 9: Swap — give 1, take 1 (Ace can try to block).';
+  if (r==='J') return 'Sigil J: +1 point or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r==='Q') return 'Sigil Q: +2 points or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r==='K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
+  return 'Normal: make Sets, Runs, or Pairs. Same-suit Runs can trigger suit bonuses.';
+}
+
+/* Construct preview bar */
+#constructPreview{
+  position:sticky; bottom:0; left:0; right:0;
+  margin:8px 10px; padding:10px 12px;
+  background:#0e1622; border:1px solid var(--border);
+  border-radius:12px; color:var(--ink); display:none;
+  align-items:center; justify-content:space-between; gap:10px;
+}
+#constructPreview .left{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+#constructPreview .pill{ background:#0d1522; }
+.preview-good{ color:var(--ok) }
+.preview-bad{ color:var(--bad) }
+.card.selected.preview-glow{
+  box-shadow:0 0 0 3px var(--sel), 0 12px 26px rgba(108,196,255,.28);
+}
+    
   </script>
 </body>
 </html>
