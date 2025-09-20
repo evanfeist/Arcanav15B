@@ -98,7 +98,11 @@
       padding:10px 12px calc(12px + var(--safe-bottom));z-index:50;
       transition:transform .25s ease, opacity .2s ease
     }
-    .tabbar .tray{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+    .tabbar .tray{
+  display:grid;
+  grid-template-columns:repeat(7,1fr); /* was 6 */
+  gap:10px;
+}
     .tabbar button{padding:12px 8px;border-radius:12px}
     body.drawer-open .tabbar{transform:translateY(120%);opacity:0;pointer-events:none}
 
@@ -360,36 +364,7 @@
               </ul>
             </div>
 
-    <button id="tutorialClose" aria-label="Close tutorial">Close</button>
-  </header>
-  <div class="body" style="font-size:14px;color:var(--sub)">
-    <div class="step active">
-      <h4 style="margin:0 0 6px 0;color:var(--ink)">1) Build Constructs for points</h4>
-      <p>Make Pairs, Sets, or Runs. Pages (Jokers) can help, but may cost points and extra discards.</p>
-    </div>
-    <div class="step">
-      <h4 style="margin:0 0 6px 0;color:var(--ink)">2) Actions (6/7/9)</h4>
-      <p>6 draws 2. 7 steals 1 (Ace can try to block). 9 swaps a card (Ace can try to block).</p>
-    </div>
-    <div class="step">
-      <h4 style="margin:0 0 6px 0;color:var(--ink)">3) Sigils (J/Q/K)</h4>
-      <p>Choose Points (J+1/Q+2/K+3) or Draw (J/Q +1, K +2). Opponent can auto-block by discarding 2 Aces.</p>
-    </div>
-    <div class="step">
-      <h4 style="margin:0 0 6px 0;color:var(--ink)">4) Suit bonuses</h4>
-      <p>Constructs with one suit (no Pages) gain bonuses: ♥ +3 • ♣ extra turn • ♦ steal points • ♠ steal up to 2 cards.</p>
-    </div>
-    <div class="panel" style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
-      <label style="display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="tutorialDontShow"> Don’t show again
-      </label>
-      <div style="display:flex;gap:8px">
-        <button id="tutorialPrev">Back</button>
-        <button id="tutorialNext" class="btn-ok">Next</button>
-      </div>
-    </div>
-  </div>
-</div>
+    
             <div>
               <strong>Sets</strong> (3+ of the same rank)
               <ul style="margin:4px 0 0 1rem;padding:0">
@@ -473,12 +448,44 @@
       </div>
     </div>
   </div>
+  
 <div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true" role="dialog">
   <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
     <h3 style="margin:0">How to Play</h3>
     <div id="tutorialDots" aria-hidden="true">
       <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
     </div>
+    <button id="tutorialClose" aria-label="Close tutorial">Close</button>
+  </header>
+  <div class="body" style="font-size:14px;color:var(--sub)">
+    <div class="step active">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">1) Build Constructs for points</h4>
+      <p>Make Pairs, Sets, or Runs. Pages (Jokers) can help, but may cost points and extra discards.</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">2) Actions (6/7/9)</h4>
+      <p>6 draws 2. 7 steals 1 (Ace can try to block). 9 swaps a card (Ace can try to block).</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">3) Sigils (J/Q/K)</h4>
+      <p>Choose Points (J+1/Q+2/K+3) or Draw (J/Q +1, K +2). Opponent can auto-block by discarding 2 Aces.</p>
+    </div>
+    <div class="step">
+      <h4 style="margin:0 0 6px 0;color:var(--ink)">4) Suit bonuses</h4>
+      <p>One-suit Constructs (no Pages) gain bonuses: ♥ +3 • ♣ extra turn • ♦ steal points • ♠ steal up to 2 cards.</p>
+    </div>
+
+    <div class="panel" style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
+      <label style="display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="tutorialDontShow"> Don’t show again
+      </label>
+      <div style="display:flex;gap:8px">
+        <button id="tutorialPrev">Back</button>
+        <button id="tutorialNext" class="btn-ok">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
 
   <!-- Settings Drawer -->
   <div class="drawer" id="settingsDrawer" aria-label="Settings" aria-hidden="true">
