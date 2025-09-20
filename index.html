@@ -1109,151 +1109,235 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
   // === AI ===
   function aiFind(pid,rank){ return G.players[pid].hand.find(c=>c.rank===rank) }
   function aiPickSigil(pid){
-  const h=G.players[pid].hand;
-  const s=h.find(c=>isJQK(c.rank));
-  if(!s) return null;
+  const h = G.players[pid].hand;
+  const s = h.find(c => isJQK(c.rank));
+  if (!s) return null;
 
-  const me=G.players[pid], opp=G.players[1-pid];
+  const me = G.players[pid], opp = G.players[1-pid];
   const need = 60 - me.score;
   const gain = (s.rank==='J'?1:s.rank==='Q'?2:3);
 
-  // If scoring this Sigil wins now, do it.
-  if (gain >= need) return {id:s.id,rank:s.rank,mode:'points'};
+  // lethal points → always take points
+  if (gain >= need) return { id:s.id, rank:s.rank, mode:'points' };
 
-  // EXPERT: prefer draw when hand is thin or about to chain; points when ahead
-  if (Pref.ai==='expert'){
-    if (me.hand.length <= 3) return {id:s.id,rank:s.rank,mode:'draw'};
-    if (me.score + gain >= opp.score) return {id:s.id,rank:s.rank,mode:'points'};
-    if (s.rank==='K' && me.hand.length<=5) return {id:s.id,rank:s.rank,mode:'draw'};
-    return {id:s.id,rank:s.rank,mode:'points'};
-  }
+  const oppHandBig = G.players[1-pid].hand.length >= 6;
+  const playerBlocksOften = Telemetry.player.blocksByAce >= 2;
 
-  // HARD: if behind, score points; if hand small, draw
-  if (Pref.ai==='hard'){
-    if (me.hand.length<=4) return {id:s.id,rank:s.rank,mode:'draw'};
-    if (me.score < opp.score) return {id:s.id,rank:s.rank,mode:'points'};
-    return {id:s.id,rank:s.rank,mode:'points'};
-  }
+  // risk: if opp likely to autoblock (big hand / has been blocking), prefer draw when not lethal
+  const risky = oppHandBig || playerBlocksOften;
 
-  // Others
-  return {id:s.id,rank:s.rank,mode:(h.length<=4?'draw':'points')};
+  // prefer draw when our hand is thin or risk is high; K draws 2 so extra nice when low
+  const wantDraw = (h.length <= 4) || risky || (s.rank==='K' && h.length<=6);
+
+  return { id:s.id, rank:s.rank, mode: (wantDraw ? 'draw' : 'points') };
 }
   function aiPickTrash(pid){
   const h = G.players[pid].hand.slice();
+  const me = G.players[pid], opp = G.players[1-pid];
+  const expert = (Pref.ai === 'expert');
+  const weAreBehind = me.score < opp.score;
 
-  // Utility: how "connected" a card is to potential sets/runs
-  function synergyScore(c){
-    if (isPage(c)) return 5;                // keep Pages by default
-    if (c.rank === 'A') return 4.5;         // Aces = defense/counter
-    if (isJQK(c.rank)) return 4.0;          // Sigils = tempo/points
-    if (c.rank==='6'||c.rank==='7'||c.rank==='9') return 3.8; // actions are tactical
+  function clusterScore(c){
+    if (isPage(c)) return 5.5;                          // keep pages
+    if (c.rank === 'A') return 5.2;                     // keep aces (defense / counter / sigil autoblock)
+    if (isJQK(c.rank)) return 4.8;                      // keep sigils
+    if (c.rank==='6'||c.rank==='7'||c.rank==='9') return 4.4; // actions = tactical
 
-    // Sets potential
-    const sameRank = h.filter(x => !isPage(x) && x.rank === c.rank).length;
+    // set potential
+    const same = h.filter(x => !isPage(x) && x.rank === c.rank).length;
+    // run potential (neighbors in suit)
+    const v = RVAL(c.rank);
+    const near = h.filter(x => !isPage(x) && x.suit===c.suit && Math.abs(RVAL(x.rank)-v)===1).length;
+    // suit cluster (help suit bonuses later)
+    const suitCount = h.filter(x => !isPage(x) && x.suit===c.suit).length;
 
-    // Runs potential (neighbors in same suit)
-    const val = RVAL(c.rank);
-    const near = h.filter(x => !isPage(x) && x.suit===c.suit && Math.abs(RVAL(x.rank)-val)===1).length;
-
-    return (sameRank>=2 ? 3.0 : sameRank>=1 ? 2.2 : 0.8) + (near>=2 ? 2.4 : near>=1 ? 1.2 : 0.2);
+    let s = 0.0;
+    s += (same>=3 ? 3.4 : same===2 ? 2.4 : same===1 ? 1.2 : 0.2);
+    s += (near>=2 ? 2.6 : near===1 ? 1.4 : 0.0);
+    s += (suitCount>=3 ? 0.8 : 0.0);                     // small nudge to keep clusters
+    return s;
   }
 
-  // Lower utility → better trash
-  h.sort((a,b)=> synergyScore(a) - synergyScore(b));
+  // Lower score = better trash
+  h.sort((a,b)=> clusterScore(a) - clusterScore(b));
 
-  if (Pref.ai==='expert'){
-    // In expert, avoid discarding cards that would complete a near-run or 3-set
-    const best = h.find(c => synergyScore(c) < 1.8) || h[0];
-    return best;
+  let cand = h[0];
+
+  // EXPERT safeguards: if behind, don't discard 7/9/6 unless nothing else
+  if (expert && weAreBehind){
+    const safer = h.find(c => !(c.rank==='7'||c.rank==='9'||c.rank==='6'||isJQK(c.rank)||c.rank==='A'||isPage(c)));
+    if (safer) cand = safer;
   }
 
-  // Hard/others: still bias by synergy (better than raw rank)
-  return h[0];
+  return cand;
 }
-  function aiChooseGive(pid,nineId){
-    const pool=G.players[pid].hand.filter(c=>c.id!==nineId).slice();
-    const val=(c)=> isPage(c)?100 : c.rank==='A'?90 : c.rank==='K'?80 : c.rank==='Q'?75 : c.rank==='J'?70 : c.rank==='9'?60 : c.rank==='7'?55 : c.rank==='6'?50 : RVAL(c.rank);
-    if(Pref.ai==='expert'){ pool.sort((a,b)=>val(a)-val(b)); return pool[0] ? pool[0].id : undefined }
-    pool.sort((a,b)=>{const sa=isPage(a)?99:(a.rank==='A'?80:RVAL(a.rank));const sb=isPage(b)?99:(b.rank==='A'?80:RVAL(b.rank));return sa-sb}); return pool[0] ? pool[0].id : undefined;
+  function aiChooseGive(pid, nineId){
+  const pool = G.players[pid].hand.filter(c => c.id !== nineId).slice();
+  // rank by "keep value" (lower is worse → choose first)
+  function keepValue(c){
+    if (isPage(c)) return 100;
+    if (c.rank==='A') return 90;
+    if (c.rank==='K') return 80;
+    if (c.rank==='Q') return 75;
+    if (c.rank==='J') return 70;
+    if (c.rank==='9') return 60;
+    if (c.rank==='7') return 55;
+    if (c.rank==='6') return 50;
+
+    // synergy fallback
+    const v = RVAL(c.rank);
+    const same = pool.filter(x => !isPage(x) && x.rank===c.rank).length;
+    const near = pool.filter(x => !isPage(x) && x.suit===c.suit && Math.abs(RVAL(x.rank)-v)===1).length;
+    return v - 0.8*same - 0.6*near;
   }
+  pool.sort((a,b)=> keepValue(a) - keepValue(b));
+  return pool[0] ? pool[0].id : undefined;
+}
   function aiWantsAce(pid){
-    const me=G.players[pid], opp=G.players[1-pid];
-    const myAces=me.hand.filter(c=>c.rank==='A').length; if(myAces===0) return false;
-    if(Pref.ai==='easy') return Math.random()<0.35;
-    if(Pref.ai==='hard') return Math.random()<0.8 || 60-me.score<=5 || 60-opp.score<=5 || me.hand.length>=5;
-    if(Pref.ai==='expert'){ const meTo60=60-me.score, oppTo60=60-opp.score; if(oppTo60<=4||meTo60<=5) return true; if(me.hand.length>=5) return true; return Math.random()<0.85 }
-    return Math.random()<0.6 || 60-me.score<=5 || 60-opp.score<=5;
+  // Should AI spend an Ace to block 7/9? (For Sigil autoblock, separate rule in query)
+  const me = G.players[pid], opp = G.players[1-pid];
+  const expert = (Pref.ai === 'expert');
+
+  const myAces = me.hand.filter(c=>c.rank==='A').length;
+  if (myAces === 0) return false;
+
+  const myTo60  = 60 - me.score;
+  const oppTo60 = 60 - opp.score;
+  const weAreBehind = me.score < opp.score;
+
+  // Baseline tendencies by difficulty
+  if (!expert){
+    if (Pref.ai === 'easy')  return Math.random() < 0.35;
+    if (Pref.ai === 'hard')  return Math.random() < 0.8 || myTo60<=5 || oppTo60<=5 || me.hand.length>=5;
+    // normal
+    return Math.random() < 0.6 || myTo60<=5 || oppTo60<=5;
   }
+
+  // Expert:
+  // Spend if blocking prevents lethal swing or when behind and hand is healthy.
+  if (oppTo60 <= 4) return true;              // they’re about to win → block
+  if (weAreBehind && me.hand.length >= 5) return true;   // we need the tempo
+  if (myTo60 <= 4) return false;              // save for our own finish or sigil autoblock
+  // If we have 2+ Aces, more liberal
+  if (myAces >= 2) return true;
+
+  // Slight randomness to avoid total predictability
+  return Math.random() < 0.55;
+}
   function combos(arr,k,cap=9999){
     const out=[]; const n=arr.length;
     const rec=(start,take,buf)=>{ if(out.length>=cap) return; if(take===0){ out.push(buf.slice()); return } for(let i=start;i<=n-take;i++){ buf.push(arr[i]); rec(i+1,take-1,buf); buf.pop(); if(out.length>=cap) return } };
     rec(0,k,[]); return out;
   }
   function aiBestConstruct(pid){
-    const hand=G.players[pid].hand; let best=null,bestPts=-999;
-    const ids=hand.map(c=>c.id);
-    const cap = (
-  Pref.ai === 'easy'   ? 120  :
-  Pref.ai === 'normal' ? 250  :
-  Pref.ai === 'hard'   ? 1200 : 
-  /* expert */           6000   
-);
-    for(let len=Math.min(7,hand.length);len>=2;len--){
-      const comb=combos(ids,len,cap);
-      for(const set of comb){
-        const cards=hand.filter(c=>set.includes(c.id));
-        const check=validateConstruct(cards);
-        if(!check.valid) continue;
-        let score=check.points;
-// Heuristic upgrades for stronger difficulties
-if (Pref.ai === 'hard' || Pref.ai === 'expert') {
-  const usesJokers = cards.some(isPage);
-  const usesPower  = cards.some(c => c.rank==='A' || isJQK(c.rank) || c.rank==='6' || c.rank==='7' || c.rank==='9');
+  const hand = G.players[pid].hand;
+  let best = null, bestScore = -1e9;
 
-  if (Pref.ai === 'hard') {
-    if (usesJokers) score -= 0.5 * check.jokersUsed;
-    if (usesPower)  score -= 0.2;
-    if (check.suitBonus === 'HEARTS')   score += 0.6;
-    if (check.suitBonus === 'DIAMONDS') score += 1.0;
-    if (check.suitBonus === 'SPADES')   score += 0.8;
-    if (check.suitBonus === 'CLUBS')    score += 1.5;
+  const ids = hand.map(c => c.id);
+  const me  = G.players[pid];
+  const opp = G.players[1 - pid];
+  const myTo60  = 60 - me.score;
+  const oppTo60 = 60 - opp.score;
+  const behind  = me.score < opp.score;
+  const expert  = (Pref.ai === 'expert');
+
+  // EXPERT: search more combinations (still safe in-browser)
+  const cap = (
+    Pref.ai === 'easy'   ? 120   :
+    Pref.ai === 'normal' ? 250   :
+    Pref.ai === 'hard'   ? 2000  :
+    /* expert */           12000
+  );
+
+  // phase weights
+  const W = {
+    // base
+    pts: 1.0,
+    size: expert ? 0.25 : 0.10,            // prefer bigger melds a bit
+    usePage: expert ? -1.2 : -0.6,         // pages used inside melds hurt
+    burnPower: expert ? -1.0 : -0.3,       // burning A/6/7/9/J/Q/K inside a construct is costly
+    // suit bonuses
+    hearts: expert ? 2.2 : 0.7,
+    diamonds: expert ? 4.8 : 1.0,
+    spades: expert ? 3.0 : 0.8,
+    clubs: expert ? 6.5 : 1.6,
+    // phase sensitive
+    lethal: 9.0,                            // any construct that wins
+    catchUp: behind ? 1.6 : 0.0,            // more value if behind
+    nearWin: (myTo60 <= 8) ? 1.4 : 0.0,     // prioritize quick scoring when close
+    oppClose: (oppTo60 <= 8) ? -0.4 : 0.0   // mild penalty vs slow lines when opp is close
+  };
+
+  function cardIsPower(c){
+    return isPage(c) || c.rank==='A' || isJQK(c.rank) || c.rank==='6' || c.rank==='7' || c.rank==='9';
   }
 
-  if (Pref.ai === 'expert') {
-    if (check.suitBonus === 'CLUBS')    score += 6.0;   // extra turn chaining is huge
-    if (check.suitBonus === 'DIAMONDS') score += 4.5;
-    if (check.suitBonus === 'SPADES')   score += 3.2;
-    if (check.suitBonus === 'HEARTS')   score += 2.0;
+  for (let len = Math.min(7, hand.length); len >= 2; len--){
+    const comb = combos(ids, len, cap);
+    for (const set of comb){
+      const cards = hand.filter(c => set.includes(c.id));
+      const check = validateConstruct(cards);
+      if (!check.valid) continue;
 
-    if (usesJokers) score -= Math.max(1.0, 0.8 * check.jokersUsed);
-    if (usesPower)  score -= 0.8;       // avoid burning action/defense pieces inside constructs
+      // base score = raw points
+      let s = W.pts * check.points;
 
-    score += 0.15 * cards.length;       // tiny preference for bigger melds
+      // suit bonus shaping
+      if (check.suitBonus === 'HEARTS')   s += W.hearts;
+      if (check.suitBonus === 'DIAMONDS') s += W.diamonds;
+      if (check.suitBonus === 'SPADES')   s += W.spades;
+      if (check.suitBonus === 'CLUBS')    s += W.clubs;
 
-    const me = G.players[pid];
-    const after = me.score + check.points;
-    if (after >= 60) score += 8;        // winning lines get a big bump
-    if (check.suitBonus === 'CLUBS' && (G.turn === pid) && (G.clubChain < 2)) {
-      score += 2.5;                     // maintain club chains if possible
-    }
-  }
-}
-        if(score>bestPts){
-          bestPts=score; best={ids:set.slice(),info:check,extras:[]};
-          if(check.jokersUsed>0 && check.kind!=='PAGE_ONLY'){
-            const excluded=new Set(set); const pool=hand.filter(c=>!excluded.has(c.id)&&!isPage(c));
-            pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
-            if(pool.length>=check.jokersUsed){ best.extras=pool.slice(0,check.jokersUsed).map(c=>c.id) } else { best=null }
-          }
+      // size encouragement
+      s += W.size * cards.length;
+
+      // penalties for using jokers or power cards in the meld
+      const usesPage  = cards.some(isPage);
+      const usesPower = cards.some(cardIsPower);
+      if (usesPage)  s += W.usePage * (check.jokersUsed || 1);
+      if (usesPower) s += W.burnPower;
+
+      // phase tweaks
+      if (me.score + check.points >= 60) s += W.lethal;
+      s += W.catchUp + W.nearWin + W.oppClose;
+
+      // EXPERT: prefer club-chaining if we still have stuff to do next turn
+      if (expert && check.suitBonus === 'CLUBS' && (G.turn === pid) && (G.clubChain < 2)){
+        // reward more when we keep at least 1 action/sigil/ace in hand
+        const rest = hand.filter(c => !set.includes(c.id));
+        const hasTempo = rest.some(c => c.rank==='6' || c.rank==='7' || c.rank==='9' || isJQK(c.rank) || c.rank==='A');
+        if (hasTempo) s += 2.8;
+      }
+
+      // Ensure page-cost feasibility (already in your code)
+      let extras = [];
+      if (check.jokersUsed > 0 && check.kind !== 'PAGE_ONLY'){
+        const excl = new Set(set);
+        const pool = hand.filter(c => !excl.has(c.id) && !isPage(c));
+        pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
+        if (pool.length >= check.jokersUsed){
+          extras = pool.slice(0, check.jokersUsed).map(c=>c.id);
+        } else {
+          continue;
         }
       }
-      if(best) break;
+
+      if (s > bestScore){
+        bestScore = s;
+        best = { ids: set.slice(), info: check, extras };
+      }
     }
-    return best;
+    if (best) break; // take the best of the longest size first
   }
+  return best;
+}
   function aiTakeTurn(){
-  if(!G.started || G.turn!==1) return;
-  const pid=1;
+  if (!G.started || G.turn !== 1) return;
+  const pid=1, me=G.players[1], opp=G.players[0];
+  const myTo60  = 60 - me.score;
+  const oppTo60 = 60 - opp.score;
+  const handLen = me.hand.length;
+  const expert  = (Pref.ai === 'expert');
 
   const best = aiBestConstruct(pid);
   const sig  = aiPickSigil(pid);
@@ -1261,45 +1345,74 @@ if (Pref.ai === 'hard' || Pref.ai === 'expert') {
   const a9   = aiFind(pid,'9');
   const a6   = aiFind(pid,'6');
 
-  // 1) If we have a strong construct, do it first
-  if(best){
-    applyAction({type:'CONSTRUCT',pid,ids:best.ids,extras:best.extras||[],info:best.info});
+  // telemetry reads
+  const playerIsBuilder =
+    (Telemetry.turnsSincePlayerAction >= 2) ||
+    (Telemetry.player.constructs > (Telemetry.player.actions + Telemetry.player.sigils));
+  const playerBlocksOften = Telemetry.player.blocksByAce >= 2;
+
+  // 0) Lethal first
+  if (best && me.score + best.info.points >= 60){
+    applyAction({type:'CONSTRUCT', pid, ids:best.ids, extras:best.extras||[], info:best.info});
+    return;
+  }
+  if (sig){
+    const gain = (sig.rank==='J'?1:sig.rank==='Q'?2:3);
+    if (me.score + gain >= 60){
+      applyAction({type:'SIGIL', pid, rank:sig.rank, cardId:sig.id, mode:sig.mode});
+      return;
+    }
+  }
+
+  // 1) Opponent close to winning → disrupt (7/9) before value
+  if (expert && oppTo60 <= 8){
+    if (a7){ applyAction({type:'ACTION_7', pid, cardId:a7.id}); return; }
+    if (a9){ const giveId = aiChooseGive(pid, a9.id); applyAction({type:'ACTION_9', pid, cardId:a9.id, giveId}); return; }
+  }
+
+  // 2) High-value construct (threshold depends on phase)
+  if (best){
+    const pts = best.info.points;
+    const threshold = expert ? (myTo60 <= 12 ? 9 : 11) : 7;
+    if (pts >= threshold){
+      applyAction({type:'CONSTRUCT', pid, ids:best.ids, extras:best.extras||[], info:best.info});
+      return;
+    }
+  }
+
+  // 3) If player is “builder”, push disruption even if not behind
+  if (expert && playerIsBuilder){
+    if (a9){ const giveId = aiChooseGive(pid, a9.id); applyAction({type:'ACTION_9', pid, cardId:a9.id, giveId}); return; }
+    if (a7){ applyAction({type:'ACTION_7', pid, cardId:a7.id}); return; }
+  }
+
+  // 4) If behind, use 7 to pressure; if not, look to sigils
+  const weAreBehind = me.score < opp.score;
+  if (expert && weAreBehind && a7){
+    applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
+  }
+
+  // 5) Sigil with mode chosen by aiPickSigil
+  if (sig){
+    // If opponent blocks often & hand is tiny, bias draw again
+    const forceDraw = playerBlocksOften && handLen <= 4;
+    applyAction({type:'SIGIL', pid, rank:sig.rank, cardId:sig.id, mode: (forceDraw ? 'draw' : sig.mode)});
     return;
   }
 
-  // 2) EXPERT: press with 7/9 before sigils if the board suggests disruption
-  if (Pref.ai==='expert'){
-    if (a7 && G.players[0].hand.length > G.players[1].hand.length){
-      applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
-    }
-    if (a9){
-      const giveId=aiChooseGive(pid,a9.id);
-      if (G.players[pid].score >= G.players[1-pid].score){
-        applyAction({type:'ACTION_9', pid, cardId:a9.id, giveId}); return;
-      }
-    }
-  }
-
-  // 3) HARD: more willing to use 7 when behind
-  if (Pref.ai==='hard'){
-    if (a7 && G.players[pid].score < G.players[1-pid].score){
-      applyAction({type:'ACTION_7', pid, cardId:a7.id}); return;
-    }
-  }
-
-  // 4) If a Sigil is available, use it (can be lethal or tempo)
-  if(sig){
-    applyAction({type:'SIGIL',pid,rank:sig.rank,cardId:sig.id,mode:sig.mode});
-    return;
-  }
-
-  // 5) Gas up if we're low
-  if (a6 && G.players[pid].hand.length<=5){
+  // 6) Gas up when thin
+  if (a6 && handLen <= (expert ? 6 : 5)){
     applyAction({type:'ACTION_6', pid, cardId:a6.id}); return;
   }
 
-  // 6) Fallback: discard least-useful card (synergy-aware)
-  const toss=aiPickTrash(pid);
+  // 7) Any decent construct now
+  if (best){
+    applyAction({type:'CONSTRUCT', pid, ids:best.ids, extras:best.extras||[], info:best.info});
+    return;
+  }
+
+  // 8) Fallback: discard
+  const toss = aiPickTrash(pid);
   applyAction({type:'DISCARD', pid, cardId:toss.id});
 }
 
