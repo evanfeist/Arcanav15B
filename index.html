@@ -1090,6 +1090,9 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
       const {rank,mode}=info||{};
       if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(`${actor===0?'P1':'P2'} played ${rank}: +${add}.`); }
       else { const drawN=(rank==='K'?2:1); draw(actor,drawN); log(`${actor===0?'P1':'P2'} played ${rank}: draw ${drawN}.`); }
+
+      if (actor === 0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
+      
       if (G.players[actor].score >= 60) {
   log(`${actor===0?'P1':'P2'} win (60)!`);
   buzz(60);
@@ -1473,8 +1476,7 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
       if(kind==='ASIG'){
         if(use && haveNAces(1,2)){
   spendNAces(1,2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
-  notePlayerAceBlockSuccess();
-  G.aceQuery=null; endTurn(); return
+G.aceQuery=null; endTurn(); return
 }
         G.aceQuery=null; return aceResolveNoUse('ASIG',actor,target,info);
       } else {
@@ -1483,10 +1485,9 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
         if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
         else {
   spendNAces(1,1); G.players[1].score+=1; bumpScore(1);
-  notePlayerAceBlockSuccess();
-  if (kind === 'A9' && info && info.give) G.discard.push(info.give);
-  log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-  G.aceQuery=null; return endTurn()
+if (kind === 'A9' && info && info.give) G.discard.push(info.give);
+log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+G.aceQuery=null; return endTurn()
 }
       }
     }
