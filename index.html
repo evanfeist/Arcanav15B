@@ -1943,6 +1943,8 @@ $('tutorialClose').onclick = ()=>{
   function wireButtons(){
 const tbtn = $('btnTutorial');
 if (tbtn) tbtn.onclick = ()=> openDrawer($('tutorialDrawer'));
+    const mbT = $('mbTutorial');
+if (mbT) mbT.onclick = ()=> openDrawer($('tutorialDrawer'));
     // Desktop
     $('btnStart').onclick = ()=> userAction({type:'START', pid:myPid()});
     $('btnRules').onclick = ()=> openDrawer($('rulesDrawer'));
