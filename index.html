@@ -998,21 +998,27 @@ if (cards.length >= 3 && sameSuit) {
   const best = (B.gaps < A.gaps ? B : A); // pick the easier interpretation
 
   if (best.ok && best.gaps <= pages.length) {
-    // 🔸 scoring: Ace is ALWAYS 1 here
-    const sum = non.reduce((s,c)=> s + RVAL(c.rank), 0);
+  // Aces always score low (1)
+  const sum = non.reduce((s,c)=> s + RVAL(c.rank), 0);
 
-    res.valid = true;
-    res.kind = 'RUN';
-    res.points = sum + cards.length;
+  res.valid = true;
+  res.kind = 'RUN';
 
-    if (pages.length === 0) {
-      // suit bonus allowed only if no Pages used in the run
-      applySuitBonus(res, true);
-    } else {
-      res.points -= pages.length; // page penalty
-    }
-    return res;
+  // Pages only extend length, never add rank value
+  res.points = sum + non.length + pages.length;
+
+  // Apply page penalties
+  if (pages.length > 0) {
+    res.points -= pages.length; // –1 each
   }
+
+  // Suit bonus only if no Pages
+  if (pages.length === 0) {
+    applySuitBonus(res, true);
+  }
+
+  return res;
+}
 }
     
     if(cards.length===2 && pages.length===0){
