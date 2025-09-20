@@ -844,10 +844,47 @@ render(); maybeSafetyDraw(); saveState();
     const suit=sameSuit?non[0].suit:null;
     res.suit=suit;
 
-// NEW RULE: mixed-suit constructs are invalid (except Page-only handled above)
-if (non.length > 0 && !sameSuit) {
-  res.reason = 'Construct must be one suit (no mixed suits)';
-  return res;
+// RUNS: must be one suit (Pages allowed as gaps); Aces can be 1 or 14 for validation,
+// but ALWAYS score as 1.
+if (cards.length >= 3 && sameSuit) {
+  const aceHighVals = non.map(c => (c.rank === 'A' ? 14 : RVAL(c.rank)));
+  const aceLowVals  = non.map(c => RVAL(c.rank)); // A = 1
+
+  function analyze(vals){
+    const arr = vals.slice().sort((a,b)=>a-b);
+    // no duplicate ranks in a run
+    for (let i=1;i<arr.length;i++){
+      if (arr[i] === arr[i-1]) return {ok:false, gaps:1e9};
+    }
+    let gaps = 0;
+    for (let i=1;i<arr.length;i++){
+      const diff = arr[i] - arr[i-1];
+      if (diff <= 0) return {ok:false, gaps:1e9};
+      gaps += (diff - 1);
+    }
+    return {ok:true, gaps};
+  }
+
+  const A = analyze(aceLowVals);
+  const B = analyze(aceHighVals);
+  const best = (B.gaps < A.gaps ? B : A); // pick the easier interpretation
+
+  if (best.ok && best.gaps <= pages.length) {
+    // 🔸 scoring: Ace is ALWAYS 1 here
+    const sum = non.reduce((s,c)=> s + RVAL(c.rank), 0);
+
+    res.valid = true;
+    res.kind = 'RUN';
+    res.points = sum + cards.length;
+
+    if (pages.length === 0) {
+      // suit bonus allowed only if no Pages used in the run
+      applySuitBonus(res, true);
+    } else {
+      res.points -= pages.length; // page penalty
+    }
+    return res;
+  }
 }
     
     if(cards.length===2 && pages.length===0){
