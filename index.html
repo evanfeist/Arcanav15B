@@ -972,19 +972,24 @@ if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
         const extraTurn=(check.suitBonus==='CLUBS');
         if(G.players[pid].score>=60){ log(`${pid===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
 
-        if(extraTurn){
-          endOfTurnDraw(pid);
-          G.clubChain=(G.turn===pid ? G.clubChain+1 : 1);
-          if(G.clubChain<=2){
-            log(`${pid===0?'P1':'P2'} take an extra turn (${G.clubChain}/2).`);
-            render(); maybeSafetyDraw(); saveState();
-            if(Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn,380);
-            if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
-            return;
-          } else {
-            log(`Clubs extra-turn cap reached (2); passing turn.`); G.clubChain=0;
-          }
-        }
+       if(extraTurn){
+  // clear any stale selections from the construct before the bonus turn
+  G.selected.clear();
+  render(); // update ARIA pressed states/visuals
+
+  endOfTurnDraw(pid); // you still draw 1 at the end of that construct turn
+  G.clubChain=(G.turn===pid ? G.clubChain+1 : 1);
+  if(G.clubChain<=2){
+    log(`${pid===0?'P1':'P2'} take an extra turn (${G.clubChain}/2).`);
+    ensureMyTurnUI();
+    render(); maybeSafetyDraw(); saveState();
+    if(Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn,380);
+    if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
+    return;
+  } else {
+    log(`Clubs extra-turn cap reached (2); passing turn.`); G.clubChain=0;
+  }
+}
         G.selected.clear(); endTurn(); return;
       }
 
@@ -1643,11 +1648,18 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
 
   // === UI wiring ===
   function selectedOne(){
-    const ids=[...G.selected];
-    if (ids.length !== 1) return null;
-    const pid=myPid();
-    return G.players[pid].hand.find(c=>c.id===ids[0]) || null;
+  const pid = myPid();
+  const handIds = new Set(G.players[pid].hand.map(c => c.id));
+
+  // prune any selected IDs that are no longer in hand
+  const pruned = [...G.selected].filter(id => handIds.has(id));
+  if (pruned.length !== G.selected.size) {
+    G.selected = new Set(pruned);
   }
+
+  if (pruned.length !== 1) return null;
+  return G.players[pid].hand.find(c => c.id === pruned[0]) || null;
+}
 
   function playSelectedAction(){
   if (!G.started){ log('Game not started.'); return; }
