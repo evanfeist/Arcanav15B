@@ -801,7 +801,7 @@ updateStartDisabled();
 
   if (G.started && Pref.mode === 'solo' && G.turn === 1) setTimeout(aiTakeTurn, 380);
   if (Net.isOnline() && Pref.role === 'host') sendSync(1);
-}
+
   }
   function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(`${pid===0?'P1':'P2'} drew 3 (safety).`); render() } }
 
