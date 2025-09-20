@@ -617,7 +617,14 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
   // Game state
   const G={deck:[],discard:[],players:[{hand:[],score:0},{hand:[],score:0}],turn:0,started:false,selected:new Set(),chooseGive:null,aceQuery:null,clubChain:0};
   const Prev={handCounts:[0,0]};
-
+const Telemetry = {
+  player: {
+    actions: 0, sigils: 0, constructs: 0, discards: 0,
+    blocksByAce: 0,
+    lastTurnType: null, // 'action'|'sigil'|'construct'|'discard'
+  },
+  turnsSincePlayerAction: 0
+};
   function buildDeck(){
     const cards=[]; let id=1;
     for(let copies=0; copies<2; copies++){
@@ -649,7 +656,15 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     }
   }
   function endOfTurnDraw(pid){ draw(pid,1) }
-
+function ensureMyTurnUI(){
+  const myTurn = G.started && (G.turn === myPid());
+  const ids = ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'];
+  ids.forEach(id => {
+    const el = $(id); if(!el) return;
+    el.disabled = !myTurn;
+    el.setAttribute('aria-disabled', String(!myTurn));
+  });
+}
   function render(){
     $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
     $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
@@ -693,11 +708,10 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     Prev.handCounts=[cur0,cur1];
 
     // Buttons
-    const myTurn=G.started && (G.turn===myPid());
-    ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'].forEach(id=>{
-      const el=$(id); if(el){ el.disabled=!myTurn; el.setAttribute('aria-disabled', String(!myTurn)) }
-    });
-    updateStartDisabled();
+const myTurn = G.started && (G.turn === myPid());
+if (!myTurn && G.selected.size) G.selected.clear(); // prevent ghost selections across turns
+ensureMyTurnUI();
+updateStartDisabled();
   }
   function updateStartDisabled(){
     const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
@@ -770,11 +784,24 @@ return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
     return out;
   }
   function endTurn(){
-    draw(G.turn,1);
-    G.turn=1-G.turn; G.selected.clear(); G.clubChain=0;
-    render(); maybeSafetyDraw(); saveState();
-    if(G.started && Pref.mode==='solo' && G.turn===1) setTimeout(aiTakeTurn,380);
-    if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
+  // draw for the player whose turn just ended
+  draw(G.turn, 1);
+
+  // advance turn and clean transient state
+  G.turn = 1 - G.turn;
+  G.selected.clear();
+  G.clubChain = 0;
+  G.aceQuery = null;   // clear any stale ace prompts
+  G.chooseGive = null; // clear any stale 9-give modal
+
+  render();
+  ensureMyTurnUI();
+  maybeSafetyDraw();
+  saveState();
+
+  if (G.started && Pref.mode === 'solo' && G.turn === 1) setTimeout(aiTakeTurn, 380);
+  if (Net.isOnline() && Pref.role === 'host') sendSync(1);
+}
   }
   function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(`${pid===0?'P1':'P2'} drew 3 (safety).`); render() } }
 
@@ -1464,20 +1491,34 @@ if (Pref.ai === 'hard' || Pref.ai === 'expert') {
   }
 
   function playSelectedAction(){
-    const c = selectedOne();
-    if (!c){ log('Select exactly one action card (6/7/9).'); return; }
-    if (c.rank === '6'){ userAction({type:'ACTION_6', pid:myPid(), cardId:c.id}); return; }
-    if (c.rank === '7'){ userAction({type:'ACTION_7', pid:myPid(), cardId:c.id}); return; }
-    if (c.rank === '9'){ openGiveDrawer(c); return; }
-    log('Not an action card.');
-  }
+  if (!G.started){ log('Game not started.'); return; }
+  if (G.turn !== myPid()){ log('Not your turn.'); return; }
+
+  const c = selectedOne();
+  if (!c){ log('Select exactly one action card (6/7/9).'); return; }
+  if (c.rank !== '6' && c.rank !== '7' && c.rank !== '9'){ log('Not an action card.'); return; }
+
+  const inHand = G.players[myPid()].hand.some(x => x.id === c.id);
+  if (!inHand){ G.selected.clear(); render(); log('That card moved. Re-select.'); return; }
+
+  if (c.rank === '6'){ userAction({type:'ACTION_6', pid:myPid(), cardId:c.id}); return; }
+  if (c.rank === '7'){ userAction({type:'ACTION_7', pid:myPid(), cardId:c.id}); return; }
+  if (c.rank === '9'){ openGiveDrawer(c); return; }
+}
 
   function playSelectedSigil(){
-    const c = selectedOne();
-    if (!c){ log('Select exactly one Sigil (J/Q/K).'); return; }
-    if (c.rank==='J' || c.rank==='Q' || c.rank==='K'){ openSigil(c); return; }
-    log('Not a Sigil.');
-  }
+  if (!G.started){ log('Game not started.'); return; }
+  if (G.turn !== myPid()){ log('Not your turn.'); return; }
+
+  const c = selectedOne();
+  if (!c){ log('Select exactly one Sigil (J/Q/K).'); return; }
+  if (!(c.rank==='J' || c.rank==='Q' || c.rank==='K')){ log('Not a Sigil.'); return; }
+
+  const inHand = G.players[myPid()].hand.some(x => x.id === c.id);
+  if (!inHand){ G.selected.clear(); render(); log('That card moved. Re-select.'); return; }
+
+  openSigil(c);
+}
 
   function discardSelected(){
     const c = selectedOne();
