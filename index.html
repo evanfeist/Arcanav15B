@@ -1033,11 +1033,29 @@ if (cards.length >= 3 && sameSuit) {
       return res;
     }
 
-    if(non.length>=2 && non.every(c=>c.rank===non[0].rank) && cards.length>=3 && pages.length>0){
-      const r=RVAL(non[0].rank), n=cards.length; let pts=(n===4?3*r:3*r+2);
-      res.valid=true;res.kind='SET';res.points=pts; if(suit && n>=5) applySuitBonus(res,true);
-      res.points-=pages.length; return res;
-    }
+    if (non.length >= 2 && non.every(c => c.rank === non[0].rank) && cards.length >= 3 && pages.length > 0) {
+  const r = RVAL(non[0].rank);
+  const n = non.length + pages.length;  // total cards in the set
+
+  let pts = 0;
+  if (n === 3) pts = 2 * r + 2;
+  else if (n === 4) {
+    const suits = new Set(non.map(c => c.suit));
+    pts = (suits.size === 4) ? 4 * r : 3 * r;
+  }
+  else if (n >= 5) pts = 3 * r + 2;
+
+  // apply penalties
+  pts -= pages.length;
+
+  res.valid = true;
+  res.kind = 'SET';
+  res.points = pts;
+
+  if (suit && n >= 5) applySuitBonus(res, true);
+
+  return res;
+}
 
 
     res.reason='Not a valid Construct'; return res;
