@@ -844,6 +844,12 @@ render(); maybeSafetyDraw(); saveState();
     const suit=sameSuit?non[0].suit:null;
     res.suit=suit;
 
+// NEW RULE: mixed-suit constructs are invalid (except Page-only handled above)
+if (non.length > 0 && !sameSuit) {
+  res.reason = 'Construct must be one suit (no mixed suits)';
+  return res;
+}
+    
     if(cards.length===2 && pages.length===0){
       if(non[0].rank===non[1].rank){
         const pts=(non[0].suit===non[1].suit)?5:2;
@@ -868,22 +874,39 @@ render(); maybeSafetyDraw(); saveState();
       res.points-=pages.length; return res;
     }
 
-    if(sameSuit && cards.length>=3){
-      const vals=non.map(c=>RVAL(c.rank)).sort((a,b)=>a-b);
-      let gaps=0;
-      for(let i=1;i<vals.length;i++){
-        const diff=vals[i]-vals[i-1];
-        if(diff<=0){ res.reason='Duplicate ranks in run'; return res }
-        gaps+=(diff-1);
-      }
-      if(gaps<=pages.length){
-        res.valid=true;res.kind='RUN';
-        const sum=non.reduce((s,c)=>s+RVAL(c.rank),0);
-        res.points=sum+cards.length;
-        if(pages.length===0) applySuitBonus(res,true); else res.points-=pages.length;
-        return res;
-      }
+    // Ace-aware RUN: try Ace low (1) and Ace high (14) and pick the cheaper (fewest gaps)
+if (sameSuit && cards.length >= 3) {
+  const aceHighVals = non.map(c => (c.rank === 'A' ? 14 : RVAL(c.rank)));
+  const aceLowVals  = non.map(c => RVAL(c.rank)); // A = 1
+
+  function analyze(vals){
+    const arr = vals.slice().sort((a,b)=>a-b);
+    for (let i=1;i<arr.length;i++){
+      if (arr[i] === arr[i-1]) return {ok:false, gaps:1e9}; // duplicate ranks kill the run
     }
+    let gaps = 0;
+    for (let i=1;i<arr.length;i++){
+      const diff = arr[i] - arr[i-1];
+      if (diff <= 0) return {ok:false, gaps:1e9};
+      gaps += (diff - 1);
+    }
+    return {ok:true, gaps};
+  }
+
+  const A = analyze(aceLowVals);
+  const B = analyze(aceHighVals);
+  const best = (B.gaps < A.gaps ? B : A);
+
+  if (best.ok && best.gaps <= pages.length) {
+    const sum = non.reduce((s,c)=> s + RVAL(c.rank), 0); // scoring still uses A=1
+    res.valid = true;
+    res.kind = 'RUN';
+    res.points = sum + cards.length;
+    if (pages.length === 0) applySuitBonus(res, true);
+    else res.points -= pages.length;
+    return res;
+  }
+}
 
     res.reason='Not a valid Construct'; return res;
   }
@@ -942,6 +965,12 @@ render(); maybeSafetyDraw(); saveState();
         G.players[pid].score+=check.points; bumpScore(pid);
         G.discard.push(...cards);
         log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`); buzz(20);
+        
+        // Explicit suit-bonus logs
+if (check.suitBonus === 'HEARTS')   log('♥ bonus: +3.');
+if (check.suitBonus === 'CLUBS')    log('♣ bonus: extra turn.');
+if (check.suitBonus === 'DIAMONDS') log('♦ bonus: steal points.');
+if (check.suitBonus === 'SPADES')   log('♠ bonus: steal up to 2 cards.');
 
         if(check.kind==='PAGE_ONLY'){
           if (check.bonus && check.bonus.draw) {
