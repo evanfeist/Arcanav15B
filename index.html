@@ -957,7 +957,8 @@ render(); maybeSafetyDraw(); saveState();
   function maybeSafetyDraw(){ if(!G.started) return; const pid=G.turn; if(G.players[pid].hand.length<=1){ draw(pid,3); log(`${pid===0?'P1':'P2'} drew 3 (safety).`); render() } }
 
   function validateConstruct(cards){
-    const res={valid:false,kind:'',points:0,suit:null,jokersUsed:0,suitBonus:null,reason:''};
+    const res={valid:false,kind:'',points:0,suit:null,jokersUsed:0,suitBonus:null,reason:''}; 
+    res.pagePenalty = 0;
     const pages=cards.filter(isPage), non=cards.filter(c=>!isPage(c));
     res.jokersUsed=pages.length;
 
@@ -1008,9 +1009,12 @@ if (cards.length >= 3 && sameSuit) {
   res.points = sum + non.length + pages.length;
 
   // Apply page penalties
-  if (pages.length > 0) {
-    res.points -= pages.length; // –1 each
-  }
+if (pages.length > 0) {
+  res.points -= pages.length;     // −1 each
+  res.pagePenalty = pages.length; // record penalty for logging/preview
+} else {
+  res.pagePenalty = 0;
+}
 
   // Suit bonus only if no Pages
   if (pages.length === 0) {
@@ -1024,7 +1028,7 @@ if (cards.length >= 3 && sameSuit) {
     if(cards.length===2 && pages.length===0){
       if(non[0].rank===non[1].rank){
         const pts=(non[0].suit===non[1].suit)?5:2;
-        res.valid=true;res.kind=(pts===5?'TRUE_PAIR':'PAIR');res.points=pts;
+        res.valid=true;res.kind=(pts===5?'TRUE_PAIR':'PAIR');res.points=pts;res.pagePenalty=0;
         if(pts===5 && suit) applySuitBonus(res,true);
         return res;
       }
@@ -1035,7 +1039,7 @@ if (cards.length >= 3 && sameSuit) {
       if(n===3) pts=2*r+2;
       else if(n===4){ const suits=new Set(non.map(c=>c.suit)); pts=(suits.size===4)?4*r:3*r; }
       else if(n>=5) pts=3*r+2;
-      res.valid=true;res.kind='SET';res.points=pts; if(suit) applySuitBonus(res,true);
+      res.valid=true;res.kind='SET';res.points=pts; res.pagePenalty=0; if(suit) applySuitBonus(res,true);
       return res;
     }
 
@@ -1053,6 +1057,7 @@ if (cards.length >= 3 && sameSuit) {
 
   // apply penalties
   pts -= pages.length;
+  res.pagePenalty = pages.length;
 
   res.valid = true;
   res.kind = 'SET';
@@ -1120,12 +1125,20 @@ function updateConstructPreview(){
   host.style.display = 'flex';
   if (res.valid){
     kindEl.textContent = res.kind.replace('_',' ');
-    let note = `+${res.points}`;
-    if (res.suitBonus==='HEARTS')   note += ' (♥ +3)';
-    if (res.suitBonus==='CLUBS')    note += ' (♣ extra turn)';
-    if (res.suitBonus==='DIAMONDS') note += ' (♦ steal)';
-    if (res.suitBonus==='SPADES')   note += ' (♠ steal cards)';
-    ptsEl.textContent = note;
+
+// build the points note first
+let note = `+${res.points}`;
+if (res.suitBonus==='HEARTS')   note += ' (♥ +3)';
+if (res.suitBonus==='CLUBS')    note += ' (♣ extra turn)';
+if (res.suitBonus==='DIAMONDS') note += ' (♦ steal)';
+if (res.suitBonus==='SPADES')   note += ' (♠ steal cards)';
+
+// append page penalty if applicable
+if (res.valid && res.kind!=='PAGE_ONLY' && (res.pagePenalty||0) > 0){
+  note += ` (−${res.pagePenalty} Pages)`;
+}
+
+ptsEl.textContent = note;
     ptsEl.classList.remove('preview-bad'); ptsEl.classList.add('preview-good');
 
     if (res.jokersUsed>0 && res.kind!=='PAGE_ONLY'){
@@ -1166,10 +1179,14 @@ $('previewPlay').onclick = ()=>{
           const extraCards=removeFromHandByIds(pid,act.extras);
           if(extraCards.length!==check.jokersUsed){ G.players[pid].hand.push(...cards,...extraCards); log('Page cost mismatch'); render(); return }
           G.discard.push(...extraCards);
+          log(`Paid Page cost: discarded ${extraCards.length}.`);
         }
         G.players[pid].score+=check.points; bumpScore(pid);
         G.discard.push(...cards);
         log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`); buzz(20);
+        if (check.kind!=='PAGE_ONLY' && (check.pagePenalty||0) > 0){
+  log(`Page penalty −${check.pagePenalty}.`);
+}
         
         // Explicit suit-bonus logs
 if (check.suitBonus === 'HEARTS')   log('♥ bonus: +3.');
