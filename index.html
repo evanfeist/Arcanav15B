@@ -166,8 +166,6 @@
   width:8px; height:8px; border-radius:999px; background:#263243; border:1px solid var(--border)
 }
 #tutorialDots .dot.on{ background:#6cc4ff; }
-    <button id="btnTutorial" class="btn-accent">❔ Tutorial</button>
-
     /* Card rank tooltips */
 .card .rank[data-tip]{ position:relative; cursor:help }
 .card .rank[data-tip]:focus::after,
@@ -179,7 +177,21 @@
   padding:6px 8px; font-size:11px; white-space:nowrap; z-index:10;
   box-shadow:var(--shadow);
 }
-    
+    /* Construct preview bar */
+#constructPreview{
+  position:sticky; bottom:0; left:0; right:0;
+  margin:8px 10px; padding:10px 12px;
+  background:#0e1622; border:1px solid var(--border);
+  border-radius:12px; color:var(--ink); display:none;
+  align-items:center; justify-content:space-between; gap:10px;
+}
+#constructPreview .left{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+#constructPreview .pill{ background:#0d1522; }
+.preview-good{ color:var(--ok) }
+.preview-bad{ color:var(--bad) }
+.card.selected.preview-glow{
+  box-shadow:0 0 0 3px var(--sel), 0 12px 26px rgba(108,196,255,.28);
+}
     /* iOS bottom padding guard */
     @supports(padding:max(0px)) {
       .tabbar { padding-bottom: max(12px, var(--safe-bottom)); }
@@ -210,7 +222,8 @@
       <div class="panel desktop-actions">
         <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
           <button id="btnStart" class="btn-ok">▶️ Start</button>
-          <button id="btnRules" class="btn-accent" aria-controls="rulesDrawer">📜 Rules</button>
+          <button id="btnRules" class="btn-accent" aria-controls="rulesDrawer">📜 Rules</button> 
+          <button id="btnTutorial" class="btn-accent">❔ Tutorial</button>
           <button id="btnConstruct">🧩 Construct</button>
           <button id="btnAction">🎯 Action (6/7/9)</button>
           <button id="btnSigil">✨ Sigil (J/Q/K)</button>
@@ -264,6 +277,7 @@
       <button id="mbSigil" aria-label="Play Sigil">✨ Sigil</button>
       <button id="mbDiscard" class="btn-warn" aria-label="Discard">🗑️ Discard</button>
       <button id="mbRules" class="btn-accent" aria-label="Rules">📜 Rules</button>
+      <button id="mbTutorial" class="btn-accent" aria-label="Tutorial">❔ Tutorial</button>
     </div>
   </nav>
 
@@ -345,12 +359,7 @@
                 <li><strong>True Pair</strong> (same rank + same suit): <strong>5</strong> pts</li>
               </ul>
             </div>
-<div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true" role="dialog">
-  <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
-    <h3 style="margin:0">How to Play</h3>
-    <div id="tutorialDots" aria-hidden="true">
-      <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
-    </div>
+
     <button id="tutorialClose" aria-label="Close tutorial">Close</button>
   </header>
   <div class="body" style="font-size:14px;color:var(--sub)">
@@ -464,6 +473,12 @@
       </div>
     </div>
   </div>
+<div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true" role="dialog">
+  <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
+    <h3 style="margin:0">How to Play</h3>
+    <div id="tutorialDots" aria-hidden="true">
+      <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
 
   <!-- Settings Drawer -->
   <div class="drawer" id="settingsDrawer" aria-label="Settings" aria-hidden="true">
@@ -2002,23 +2017,6 @@ function rankTip(c){
   if (r==='K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
   return 'Normal: make Sets, Runs, or Pairs. Same-suit Runs can trigger suit bonuses.';
 }
-
-/* Construct preview bar */
-#constructPreview{
-  position:sticky; bottom:0; left:0; right:0;
-  margin:8px 10px; padding:10px 12px;
-  background:#0e1622; border:1px solid var(--border);
-  border-radius:12px; color:var(--ink); display:none;
-  align-items:center; justify-content:space-between; gap:10px;
-}
-#constructPreview .left{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
-#constructPreview .pill{ background:#0d1522; }
-.preview-good{ color:var(--ok) }
-.preview-bad{ color:var(--bad) }
-.card.selected.preview-glow{
-  box-shadow:0 0 0 3px var(--sel), 0 12px 26px rgba(108,196,255,.28);
-}
-    
   </script>
 </body>
 </html>
