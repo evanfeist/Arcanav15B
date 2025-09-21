@@ -788,8 +788,8 @@ function suitBanner(suit, extra=''){
       Net._lastPongAt=Date.now();
       Net._hbTimer=setInterval(()=>{
         try{
-          if (!Net.ws || Net.ws.readyState!==1) return;
-          Net._sendRaw({type:'ping'});
+         if (!Net.ws || Net.ws.readyState!==1) return;
+if (Net._sendRaw) Net._sendRaw({type:'ping'});
           // if no pong for ~2 heartbeats, force close → onclose will reconnect
           if (Date.now()-Net._lastPongAt > 25000*2) {
             Net.ws.close();
