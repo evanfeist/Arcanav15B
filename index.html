@@ -205,6 +205,12 @@
     @supports(padding:max(0px)) {
       .tabbar { padding-bottom: max(12px, var(--safe-bottom)); }
     }
+    .hand.dim .card {
+  opacity: 0.45;
+  pointer-events: none; /* blocks clicks */
+  filter: grayscale(30%);
+  transition: opacity .25s ease, filter .25s ease;
+}
   </style>
 </head>
 <body>
@@ -812,6 +818,7 @@ function ensureMyTurnUI(){
   });
 }
   function render(){
+    const myTurn = G.started && (G.turn === myPid());
     $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
     $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
     $('turnTag').textContent=G.started?(G.turn===myPid()?'Your turn':(Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn'))):'—';
@@ -837,7 +844,17 @@ updateConstructPreview();
       yh.appendChild(n);
     });
     $('youCount').textContent=G.players[myPid()].hand.length;
-
+    // Dim your hand if it’s not your turn
+if (myTurn) {
+  yh.classList.remove('dim');
+} else {
+  yh.classList.add('dim');
+}
+if (myTurn) {
+  yh.classList.remove('dim');
+} else {
+  yh.classList.add('dim');
+}
     // Opponent hand (backs)
     G.players[1-myPid()].hand.forEach(_=>{
       const d=cardNode({back:true},false);
@@ -854,7 +871,6 @@ updateConstructPreview();
     Prev.handCounts=[cur0,cur1];
 
     // Buttons
-const myTurn = G.started && (G.turn === myPid());
 if (!myTurn && G.selected.size) G.selected.clear(); // prevent ghost selections across turns
 ensureMyTurnUI();
 updateStartDisabled();
