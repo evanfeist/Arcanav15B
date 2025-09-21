@@ -699,7 +699,7 @@ function suitBanner(suit, extra=''){
       (viewerPid===1? {hand:[...G.players[1].hand],score:G.players[1].score}
                     : {hand:maskHand(G.players[1].hand),score:G.players[1].score})
     ];
-    const deckLensafe=Array(G.deck.length).fill({back:true});
+    const deckLensafe = Array.from({length:G.deck.length}, ()=>({back:true}));
     return JSON.stringify({ deck:deckLensafe, discard:[...G.discard], players, turn:G.turn, started:G.started, clubChain:G.clubChain });
   }
   function deserialize(s){try{const o=JSON.parse(s); if(!o||!Array.isArray(o.deck)) return null; return o;}catch{return null;}}
@@ -845,11 +845,6 @@ updateConstructPreview();
     });
     $('youCount').textContent=G.players[myPid()].hand.length;
     // Dim your hand if it’s not your turn
-if (myTurn) {
-  yh.classList.remove('dim');
-} else {
-  yh.classList.add('dim');
-}
 if (myTurn) {
   yh.classList.remove('dim');
 } else {
