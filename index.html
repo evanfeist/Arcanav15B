@@ -806,6 +806,7 @@ if (Net._sendRaw) Net._sendRaw({type:'ping'});
       Net._reconnectTimer = setTimeout(()=>{
         Net._reconnectTimer=null;
         Net.connect();
+Net._lastPongAt = Date.now();
         Net._retryDelay = Math.min(Net._retryDelay*1.6, 8000);
       }, delay);
     },
@@ -842,6 +843,34 @@ function markPlayerTurn(kind){
 }
 function notePlayerAceBlockSuccess(){
   Telemetry.player.blocksByAce++;
+}
+// --- END PATCH ---
+// --- START PATCH: Opponent-Ace Belief Model ---
+// Estimated probabilities the human (pid 0) currently holds:
+// - at least one Ace (pAceAny)
+// - at least two Aces (pAceTwo) -> can autoblock a Sigil
+const Belief = { pAceAny: 0.35, pAceTwo: 0.15 };
+
+// Observations → update functions
+function believeSawOneAce(){
+  // human just spent 1 Ace (7/9 block)
+  Belief.pAceAny = Math.min(0.95, Belief.pAceAny + 0.15);
+  Belief.pAceTwo = Math.min(0.90, Belief.pAceTwo + 0.05);
+}
+function believeSawTwoAces(){
+  // human just spent 2 Aces (Sigil autoblock)
+  Belief.pAceTwo = Math.min(0.95, Belief.pAceTwo + 0.25);
+  Belief.pAceAny = Math.min(0.95, Belief.pAceAny + 0.20);
+}
+function believeMissedChance(){
+  // human declined or failed to use Aces when prompted
+  Belief.pAceAny = Math.max(0.05, Belief.pAceAny - 0.12);
+  Belief.pAceTwo = Math.max(0.02, Belief.pAceTwo - 0.10);
+}
+function decayBeliefSlightly(){
+  // called when a full human turn passes with no Ace evidence
+  Belief.pAceAny = Math.max(0.05, Belief.pAceAny * 0.97);
+  Belief.pAceTwo = Math.max(0.02, Belief.pAceTwo * 0.95);
 }
 // --- END PATCH ---
   function buildDeck(){
@@ -1028,6 +1057,8 @@ render(); maybeSafetyDraw(); saveState();
 
   // advance turn and clean transient state
   G.turn = 1 - G.turn;
+      // If the human just finished their turn (next up is AI), decay ace beliefs slightly
+  if (G.turn === 1) decayBeliefSlightly();
   G.selected.clear();
   G.clubChain = 0;
   G.aceQuery = null;   // clear any stale ace prompts
@@ -1452,6 +1483,8 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
   }
 
   function aceResolveNoUse(kind,actor,target,info){
+      // If the human (target===0) did not use an Ace when prompted/possible, lower belief.
+  if (target === 0) believeMissedChance();
     if(kind==='A7'){
       const th=G.players[target].hand;
       if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('7: stole a random card.'); toast('<div>7 resolved: stole a random card</div>') }
@@ -1537,9 +1570,12 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
   const me = G.players[pid], opp = G.players[1-pid];
   const need = 60 - me.score;
   const gain = (s.rank==='J'?1:s.rank==='Q'?2:3);
+  const lethal = (gain >= need);
 
-  // lethal points → always take points
-  if (gain >= need) return { id:s.id, rank:s.rank, mode:'points' };
+  // If we believe the human likely has 2 Aces, prefer draw unless lethal
+  if (!lethal && Belief.pAceTwo > 0.5){
+    return { id:s.id, rank:s.rank, mode:'draw' };
+  }
 
   const oppHandBig = G.players[1-pid].hand.length >= 6;
   const playerBlocksOften = Telemetry.player.blocksByAce >= 2;
@@ -1550,7 +1586,7 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
   // prefer draw when our hand is thin or risk is high; K draws 2 so extra nice when low
   const wantDraw = (h.length <= 4) || risky || (s.rank==='K' && h.length<=6);
 
-  return { id:s.id, rank:s.rank, mode: (wantDraw ? 'draw' : 'points') };
+  return { id:s.id, rank:s.rank, mode: (lethal ? 'points' : (wantDraw ? 'draw' : 'points')) };
 }
   function aiPickTrash(pid){
   const h = G.players[pid].hand.slice();
@@ -1752,14 +1788,27 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
   }
   return best;
 }
-  function aiTakeTurn(){
+function gameHeat(){
+  const me = G.players[1];
+  const opp = G.players[0];
+  const to60 = (p)=>60 - p.score;
+  let h = 0;
+  // if opponent is closer to 60, urgency ↑
+  h += (to60(opp) - to60(me)) * 0.5;
+  // if deck is getting thin, urgency ↑
+  if (G.deck.length < 12) h += 1;
+  // if we have a club chain running, urgency ↑
+  if (G.clubChain > 0) h += 1;
+  return h; // negative = we’re ahead, positive = we need tempo
+}
+    function aiTakeTurn(){
   if (!G.started || G.turn !== 1) return;
   const pid=1, me=G.players[1], opp=G.players[0];
   const myTo60  = 60 - me.score;
   const oppTo60 = 60 - opp.score;
   const handLen = me.hand.length;
   const expert  = (Pref.ai === 'expert');
-
+const heat = gameHeat();
   const best = aiBestConstruct(pid);
   const sig  = aiPickSigil(pid);
   const a7   = aiFind(pid,'7');
@@ -1793,13 +1842,17 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
 
   // 2) High-value construct (threshold depends on phase)
   if (best){
-    const pts = best.info.points;
-    const threshold = expert ? (myTo60 <= 12 ? 9 : 11) : 7;
-    if (pts >= threshold){
-      applyAction({type:'CONSTRUCT', pid, ids:best.ids, extras:best.extras||[], info:best.info});
-      return;
-    }
+  const pts = best.info.points;
+  let threshold = expert ? (myTo60 <= 12 ? 9 : 11) : 7;
+
+  // if heat is high (we’re under pressure), lower threshold so bot plays constructs sooner
+  if (expert && heat > 1) threshold -= 2;
+
+  if (pts >= threshold){
+    applyAction({type:'CONSTRUCT', pid, ids:best.ids, extras:best.extras||[], info:best.info});
+    return;
   }
+}
 
   // 3) If player is “builder”, push disruption even if not behind
   if (expert && playerIsBuilder){
@@ -1839,45 +1892,151 @@ toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>
 
   // Online messages
   function onSignal(p){
-    if(p.kind==='SYNC'){ const o=deserialize(p.state); if(o){ Object.assign(G,o); render() } }
-    if(p.kind==='LOG'){
-      const el=$('log');
-      if(el){ const d=document.createElement('div'); d.className='line'; d.textContent=p.text; el.appendChild(d); el.scrollTop=el.scrollHeight; flashLogLast() }
+  if (!p || !p.kind) return;
+
+  // 1) SYNC → apply state and re-render
+  if (p.kind === 'SYNC'){
+    const o = deserialize(p.state);
+    if (o){ Object.assign(G, o); render(); }
+    return;
+  }
+
+  // 2) LOG → append a line to the log
+  if (p.kind === 'LOG'){
+    const el = $('log');
+    if (el){
+      const d = document.createElement('div');
+      d.className = 'line';
+      d.textContent = p.text;
+      el.appendChild(d);
+      el.scrollTop = el.scrollHeight;
+      flashLogLast();
     }
-    if(p.kind==='INPUT' && Pref.role==='host'){ const act=p.act; if(!act) return; act.pid=1; applyAction(act); sendSync(1) }
-    if(p.kind==='ACE_PROMPT'){
-      if(Pref.role==='guest'){
-        const q=p.data;
-        G.aceQuery={kind:q.kind,actor:0,target:1,info:q.info||{rank:q.rank,mode:q.mode}};
-        $('acePrompt').textContent=
-          q.kind==='A7'?"Use an Ace to try to block 7? (d6: 4–6 blocks + counter)":
-          q.kind==='A9'?"Use an Ace to try to block 9? (d6: 4–6 blocks + counter)":
-          'Use 2 Aces to auto-block the Sigil?';
-        openAceDrawer();
-      }
-    }
-    if(p.kind==='ACE_RESPONSE' && Pref.role==='host'){
-      const {use}=p; const {kind,actor,target,info}=G.aceQuery||{};
-      if(!kind) return;
-      if(kind==='ASIG'){
-        if(use && haveNAces(1,2)){
-  spendNAces(1,2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
-G.aceQuery=null; endTurn(); return
-}
-        G.aceQuery=null; return aceResolveNoUse('ASIG',actor,target,info);
-      } else {
-        if(!use){ G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
-        const roll=1+Math.floor(Math.random()*6);
-        if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); G.aceQuery=null; return aceResolveNoUse(kind,actor,target,info) }
-        else {
-  spendNAces(1,1); G.players[1].score+=1; bumpScore(1);
-if (kind === 'A9' && info && info.give) G.discard.push(info.give);
-log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-G.aceQuery=null; return endTurn()
-}
-      }
+    return;
+  }
+
+  // 3) Guest INPUT → host validates then applies
+  if (p.kind === 'INPUT' && Pref.role === 'host'){
+  const act = p.act;
+
+  // --- game/turn guard ---
+  if (!G.started) return;
+  if (G.turn !== 1) return; // only accept guest moves on guest's turn
+
+  // --- begin whitelist + shape checks ---
+  if (!act || typeof act !== 'object') return;
+
+  const allowed = new Set(['START','CONSTRUCT','ACTION_6','ACTION_7','ACTION_9','SIGIL','DISCARD']);
+  if (!allowed.has(act.type)) return;
+
+  // quick helpers
+  const handIds = new Set(G.players[1].hand.map(c => c.id));
+  const owns = (id) => typeof id === 'number' && handIds.has(id);
+
+  if (act.type === 'CONSTRUCT'){
+    if (!Array.isArray(act.ids) || act.ids.length === 0) return;
+    if (act.ids.length > 10) return; // sanity cap
+    if (!act.ids.every(owns)) return;
+
+    if (act.extras != null){
+      if (!Array.isArray(act.extras)) return;
+      if (act.extras.length > 10) return; // sanity cap
+      if (!act.extras.every(owns)) return;
+      // no overlap between ids and extras
+      const base = new Set(act.ids);
+      if (act.extras.some(x => base.has(x))) return;
     }
   }
+
+  if (act.type === 'ACTION_6' || act.type === 'ACTION_7'){
+    if (!owns(act.cardId)) return;
+  }
+
+  if (act.type === 'ACTION_9'){
+    if (!owns(act.cardId) || !owns(act.giveId)) return;
+    if (act.cardId === act.giveId) return; // can’t give the 9 itself
+  }
+
+  if (act.type === 'SIGIL'){
+    if (!owns(act.cardId) || !act.rank || !act.mode) return;
+    const okRank = act.rank==='J' || act.rank==='Q' || act.rank==='K';
+    const okMode = act.mode==='points' || act.mode==='draw';
+    if (!okRank || !okMode) return;
+  }
+
+  if (act.type === 'DISCARD'){
+    if (!owns(act.cardId)) return;
+  }
+  // --- end whitelist + shape checks ---
+
+  act.pid = 1;             // guest is always PID 1
+  applyAction(act);
+  sendSync(1);
+  return;
+}
+
+  // 4) Host → Guest asks to show the Ace prompt
+  if (p.kind === 'ACE_PROMPT'){
+    if (Pref.role === 'guest'){
+      const q = p.data;
+      G.aceQuery = { kind:q.kind, actor:0, target:1, info:q.info || { rank:q.rank, mode:q.mode } };
+      $('acePrompt').textContent =
+        q.kind==='A7' ? "Use an Ace to try to block 7? (d6: 4–6 blocks + counter)" :
+        q.kind==='A9' ? "Use an Ace to try to block 9? (d6: 4–6 blocks + counter)" :
+                        "Use 2 Aces to auto-block the Sigil?";
+      openAceDrawer();
+    }
+    return;
+  }
+
+  // 5) Guest replies to Ace prompt → host resolves
+  if (p.kind === 'ACE_RESPONSE' && Pref.role === 'host'){
+    const { use } = p;
+    const q = G.aceQuery || {};
+    const { kind, actor, target, info } = q;
+    if (!kind) return;
+
+    if (kind === 'ASIG'){
+      if (use && haveNAces(1,2)){
+        spendNAces(1,2);
+        log(`Sigil blocked by 2 Aces → Sigil discarded.`);
+        toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
+        G.aceQuery = null;
+        endTurn();
+        return;
+      }
+      G.aceQuery = null;
+      aceResolveNoUse('ASIG', actor, target, info);
+      return;
+    } else {
+      if (!use){
+        G.aceQuery = null;
+        aceResolveNoUse(kind, actor, target, info);
+        return;
+      }
+      const roll = 1 + Math.floor(Math.random()*6);
+      if (roll <= 3){
+        log(`Ace block (d6=${roll}) → FAIL.`);
+        toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+        G.aceQuery = null;
+        aceResolveNoUse(kind, actor, target, info);
+        return;
+      }
+      spendNAces(1,1);
+      G.players[1].score += 1;
+      bumpScore(1);
+      if (kind === 'A9' && info && info.give) G.discard.push(info.give);
+      log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+      toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+      G.aceQuery = null;
+      endTurn();
+      return;
+    }
+  }
+
+  // Unknown kind → ignore
+  return;
+}
 
   // Drawers logic (now using openDrawer/closeDrawer)
   const payDrawer=$('payDrawer'), payGrid=$('payGrid'), payHint=$('payHint'), payCancel=$('payCancel'), payConfirm=$('payConfirm');
@@ -1929,9 +2088,19 @@ G.aceQuery=null; return endTurn()
 };
   }
   function closeAceDrawer(){ closeDrawer(aceDrawer) }
-  aceNo.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery; closeAceDrawer();
-    if(Pref.mode==='online' && Pref.role==='guest'){ sendSig({kind:'ACE_RESPONSE', use:false}); return }
-    G.aceQuery=null; aceResolveNoUse(q.kind,q.actor,q.target,q.info);
+    aceNo.onclick=()=>{ 
+    if(!G.aceQuery) return closeAceDrawer(); 
+    const q=G.aceQuery; 
+    closeAceDrawer();
+    // human declined → treat as evidence against holding Aces
+    believeMissedChance();
+
+    if(Pref.mode==='online' && Pref.role==='guest'){ 
+      sendSig({kind:'ACE_RESPONSE', use:false}); 
+      return; 
+    }
+    G.aceQuery=null; 
+    aceResolveNoUse(q.kind,q.actor,q.target,q.info);
   };
   aceYes.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery;
     if(q.kind==='ASIG'){
@@ -1939,6 +2108,7 @@ G.aceQuery=null; return endTurn()
         if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
         spendNAces(myPid(),2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
 notePlayerAceBlockSuccess();
+        believeSawTwoAces();
 closeAceDrawer(); G.aceQuery=null; return endTurn();
       } else { closeAceDrawer(); G.aceQuery=null; return }
     }
@@ -1965,6 +2135,7 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
       if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
       log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
       notePlayerAceBlockSuccess();
+       believeSawOneAce();
       closeAceDrawer(); G.aceQuery=null; return endTurn();
     }
   };
