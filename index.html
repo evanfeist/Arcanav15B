@@ -705,18 +705,33 @@ function suitBanner(suit, extra=''){
   function deserialize(s){try{const o=JSON.parse(s); if(!o||!Array.isArray(o.deck)) return null; return o;}catch{return null;}}
 
   // Network
-  const Net={
+    const Net={
     ws:null, connected:false, hostId:null, connecting:false,
-    isOnline(){return Pref.mode==='online' && this.connected;},
+    _sendRaw:null,
+
+    // NEW: reconnect + heartbeat state
+    _wanted:false,
+    _hbTimer:null,
+    _lastPongAt:0,
+    _reconnectTimer:null,
+    _retryDelay:800, // ms (backoff up to 8s)
+
+    isOnline(){ return Pref.mode==='online' && this.connected; },
+
     connect(){
       if(this.connected||this.connecting) return;
       this.connecting=true;
+      this._wanted=true; // we want to stay online
+
       try{ if (this.ws) this.ws.close() }catch{}
       const url=(location.protocol==='https:'?'wss':'ws')+'://arcana-signal.onrender.com';
       this.ws=new WebSocket(url);
+
       this.ws.onopen=()=>{
-        this.connected=true; this.connecting=false;
-        $('netStatus').textContent='Connected';
+        this.connected=true; this.connecting=false; $('netStatus').textContent='Connected';
+        // reset backoff on success
+        this._retryDelay=800;
+
         if(Pref.role==='host'){
           this.hostId=Pref.room || ('room-'+Math.random().toString(36).slice(2,8));
           send({type:'host',hostId:this.hostId});
@@ -728,13 +743,21 @@ function suitBanner(suit, extra=''){
           toastSafe(`Joining: ${this.hostId}`); log(`Joining room: ${this.hostId}`);
         }
         updateModeTag(); updateStartDisabled();
+        Net.startHeartbeat();
       };
+
       this.ws.onclose=()=>{
         this.connected=false; this.connecting=false; $('netStatus').textContent='Offline';
         updateModeTag(); updateStartDisabled();
+        Net.stopHeartbeat();
+        if (Net._wanted) Net.scheduleReconnect();
       };
+
       this.ws.onmessage=(ev)=>{
         let m={}; try{m=JSON.parse(ev.data);}catch{return;}
+        // NEW: pong handling for heartbeat
+        if(m.type==='pong'){ Net._lastPongAt=Date.now(); return; }
+
         if(m.type==='host-ok'){ toastSafe(`Room ready: ${m.hostId}`) }
         if(m.type==='join-ok'){ toastSafe(`Joined: ${m.hostId}`) }
         if(m.type==='guest-joined'){ toast('Guest joined.'); if(Pref.role==='host'){ sendSync(1) } }
@@ -744,11 +767,55 @@ function suitBanner(suit, extra=''){
         if(m.type==='join-error'){ toastSafe(`Join failed: ${m.reason||'host-not-found'}`) }
         if(m.type==='signal' && m.payload){ onSignal(m.payload) }
       };
+
       function send(obj){ try{ Net.ws && Net.ws.readyState===1 && Net.ws.send(JSON.stringify(obj)) }catch{} }
       Net._sendRaw=send;
     },
-    disconnect(){ try{ if (this.ws) this.ws.close() }catch{}; this.ws=null; this.connected=false; this.connecting=false; $('netStatus').textContent='Offline'; updateModeTag(); updateStartDisabled(); },
+
+    disconnect(){
+      try{ if (this.ws) this.ws.close() }catch{};
+      this.ws=null; this.connected=false; this.connecting=false;
+      this._wanted=false; // stop auto-reconnect
+      $('netStatus').textContent='Offline';
+      updateModeTag(); updateStartDisabled();
+      Net.stopHeartbeat();
+      if (Net._reconnectTimer){ clearTimeout(Net._reconnectTimer); Net._reconnectTimer=null; }
+    },
+
+    // NEW: helpers
+    startHeartbeat(){
+      Net.stopHeartbeat();
+      Net._lastPongAt=Date.now();
+      Net._hbTimer=setInterval(()=>{
+        try{
+          if (!Net.ws || Net.ws.readyState!==1) return;
+          Net._sendRaw({type:'ping'});
+          // if no pong for ~2 heartbeats, force close → onclose will reconnect
+          if (Date.now()-Net._lastPongAt > 25000*2) {
+            Net.ws.close();
+          }
+        }catch{}
+      }, 25000);
+    },
+    stopHeartbeat(){
+      if (Net._hbTimer){ clearInterval(Net._hbTimer); Net._hbTimer=null; }
+    },
+    scheduleReconnect(){
+      if (Net._reconnectTimer || !Net._wanted) return;
+      const delay = Net._retryDelay + Math.floor(Math.random()*400);
+      Net._reconnectTimer = setTimeout(()=>{
+        Net._reconnectTimer=null;
+        Net.connect();
+        Net._retryDelay = Math.min(Net._retryDelay*1.6, 8000);
+      }, delay);
+    },
   };
+// Visibility-aware reconnect kick
+document.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState==='visible' && Pref.mode==='online'){
+    if (!Net.connected && !Net.connecting && Net._wanted) Net.scheduleReconnect();
+  }
+});
   function sendSig(payload){ if(Net.ws && Net.ws.readyState===1){ Net._sendRaw({type:'signal', hostId:Net.hostId, payload}) } }
   function sendSync(toPid){
     const state=(Pref.role==='host') ? serializeFor(toPid) : serialize();
@@ -1188,6 +1255,25 @@ $('previewPlay').onclick = ()=>{
   }
 
   // APPLY core
+      function cardLabel(c){
+    if (!c) return '—';
+    if (c.back) return '🂠';
+    if (isPage(c)) return 'Pg';
+    return `${c.rank}${c.suit||''}`;
+  }
+  function labelList(cards){
+    const orderSuit={'♣':0,'♦':1,'♥':2,'♠':3,'':4};
+    return cards.slice()
+      .sort((a,b)=>{
+        if (isPage(a) && !isPage(b)) return 1;
+        if (!isPage(a) && isPage(b)) return -1;
+        const sa=orderSuit[a.suit||''], sb=orderSuit[b.suit||''];
+        if (sa!==sb) return sa-sb;
+        return RVAL(a.rank)-RVAL(b.rank);
+      })
+      .map(cardLabel)
+      .join(' ');
+  }
   function applyAction(act){
     const pid=act.pid; const opp=1-pid;
     switch(act.type){
@@ -1204,7 +1290,7 @@ $('previewPlay').onclick = ()=>{
         }
         G.players[pid].score+=check.points; bumpScore(pid);
         G.discard.push(...cards);
-        log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`); buzz(20);
+          log(`${pid===0?'P1':'P2'} played ${check.kind} [${labelList(cards)}] for +${check.points}.`); buzz(20);
         if (check.kind!=='PAGE_ONLY' && (check.pagePenalty||0) > 0){
   log(`Page penalty −${check.pagePenalty}.`);
 }
@@ -1273,26 +1359,30 @@ if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
       case 'ACTION_6': {
         const c=discardFromHandById(pid,act.cardId);
         if(!c){ log('6: invalid card.'); return }
-        draw(pid,2); log(`${pid===0?'P1':'P2'} played 6 (Draw2).`);
-if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
-G.selected.clear(); endTurn(); return;
+        draw(pid,2);
+        log(`${pid===0?'P1':'P2'} played 6 [${cardLabel(c)}] → Draw 2.`);
+        if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
+        G.selected.clear(); endTurn(); return;
       }
 
-      case 'ACTION_7': {
+            case 'ACTION_7': {
         const c=discardFromHandById(pid,act.cardId);
-if(!c){ log('7: invalid card.'); return }
-if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
-G.selected.clear(); return queryAce('A7',pid,1-pid,{cardId:act.cardId});
+        if(!c){ log('7: invalid card.'); return }
+        log(`${pid===0?'P1':'P2'} played 7 [${cardLabel(c)}] (Ace can attempt to block).`);
+        if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
+        G.selected.clear(); return queryAce('A7',pid,1-pid,{cardId:act.cardId});
       }
 
-      case 'ACTION_9': {
+            case 'ACTION_9': {
         const giveCard=G.players[pid].hand.find(c=>c.id===act.giveId);
         if(!giveCard){ log('9: invalid give card.'); return }
         const nine=G.players[pid].hand.find(c=>c.id===act.cardId && c.rank==='9');
         if(!nine){ log('9: invalid 9.'); return }
-        discardFromHandById(pid,nine.id); takeFromHandById(pid,giveCard.id);
-if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
-G.selected.clear(); return queryAce('A9',pid,1-pid,{give:giveCard});
+        discardFromHandById(pid,nine.id);
+        takeFromHandById(pid,giveCard.id);
+        log(`${pid===0?'P1':'P2'} played 9 [${cardLabel(nine)}] (Ace can attempt to block).`);
+        if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
+        G.selected.clear(); return queryAce('A9',pid,1-pid,{give:giveCard});
       }
 
       case 'SIGIL': {
@@ -1317,8 +1407,15 @@ log(`Sigil ${r}: waiting for defender...`); return;
           }
         }
 
-        if(act.mode==='points'){ const add=(r==='J'?1:r==='Q'?2:3); G.players[pid].score+=add; bumpScore(pid); log(`${pid===0?'P1':'P2'} played ${r}: +${add}.`); }
-        else { const drawN=(r==='K'?2:1); draw(pid,drawN); log(`${pid===0?'P1':'P2'} played ${r}: draw ${drawN}.`); }
+                if(act.mode==='points'){
+          const add=(r==='J'?1:r==='Q'?2:3);
+          G.players[pid].score+=add; bumpScore(pid);
+          log(`${pid===0?'P1':'P2'} played ${r} [${cardLabel(s)}] → +${add}.`);
+        } else {
+          const drawN=(r==='K'?2:1);
+          draw(pid,drawN);
+          log(`${pid===0?'P1':'P2'} played ${r} [${cardLabel(s)}] → draw ${drawN}.`);
+        }
 
         if (pid===0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
         
@@ -1370,8 +1467,15 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
     }
     if(kind==='ASIG'){
       const {rank,mode}=info||{};
-      if(mode==='points'){ const add=(rank==='J'?1:rank==='Q'?2:3); G.players[actor].score+=add; bumpScore(actor); log(`${actor===0?'P1':'P2'} played ${rank}: +${add}.`); }
-      else { const drawN=(rank==='K'?2:1); draw(actor,drawN); log(`${actor===0?'P1':'P2'} played ${rank}: draw ${drawN}.`); }
+       if(mode==='points'){
+        const add=(rank==='J'?1:rank==='Q'?2:3);
+        G.players[actor].score+=add; bumpScore(actor);
+        log(`${actor===0?'P1':'P2'} played ${rank} [—] → +${add}.`);
+      } else {
+        const drawN=(rank==='K'?2:1);
+        draw(actor,drawN);
+        log(`${actor===0?'P1':'P2'} played ${rank} [—] → draw ${drawN}.`);
+      }
 
       if (actor === 0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
       
