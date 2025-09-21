@@ -183,11 +183,16 @@
 }
     /* Construct preview bar */
 #constructPreview{
-  position:sticky; bottom:0; left:0; right:0;
-  margin:8px 10px; padding:10px 12px;
-  background:#0e1622; border:1px solid var(--border);
-  border-radius:12px; color:var(--ink); display:none;
-  align-items:center; justify-content:space-between; gap:10px;
+  margin:10px;
+  padding:10px 12px;
+  background:#0e1622;
+  border:1px solid var(--border);
+  border-radius:12px;
+  color:var(--ink);
+  display:none; /* JS toggles to flex when valid */
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
 }
 #constructPreview .left{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
 #constructPreview .pill{ background:#0d1522; }
@@ -244,13 +249,7 @@
       </header>
       <div id="yourHand" class="hand" aria-live="polite"></div>
 
-      <header class="bar">
-        <h3>Opponent Hand</h3>
-        <span class="pill"><span id="aiCount">0</span> cards</span>
-      </header>
-      <div id="aiHand" class="hand"></div>
-    </div>
-
+<!-- Construct Preview goes here -->
 <div id="constructPreview" aria-live="polite">
   <div class="left">
     <span id="previewKind" class="pill">—</span>
@@ -260,6 +259,14 @@
   </div>
   <button id="previewPlay" class="btn-ok" style="display:none">Play Construct</button>
 </div>
+<!-- End Construct Preview -->
+
+      <header class="bar">
+        <h3>Opponent Hand</h3>
+        <span class="pill"><span id="aiCount">0</span> cards</span>
+      </header>
+      <div id="aiHand" class="hand"></div>
+    </div>
     
     <!-- Right column: Log -->
     <div class="col">
