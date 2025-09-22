@@ -136,6 +136,17 @@
     @keyframes bump { 0%{transform:translateY(0)} 35%{transform:translateY(-3px)} 100%{transform:translateY(0)} }
     @keyframes toastIn { from{transform:translate(-50%,12px);opacity:0} to{transform:translate(-50%,0);opacity:1} }
     @keyframes flash { from{background:#122033} to{background:transparent} }
+    @keyframes pulseTurn {
+  0% { box-shadow: 0 0 0 0 rgba(108,196,255,.55) }
+  70% { box-shadow: 0 0 0 10px rgba(108,196,255,0) }
+  100% { box-shadow: 0 0 0 0 rgba(108,196,255,0) }
+}
+#turnTag.my-turn{
+  background:#0f1b2c;
+  border-color:#2b5aa1;
+  color:var(--ink);
+  animation: pulseTurn 1.8s ease-in-out infinite;
+}
 
     .anim-deal { animation:dealIn .28s ease forwards }
     .anim-pop { animation:pop .18s ease }
@@ -160,6 +171,7 @@
 .banner.diamond { border-color:#6a4a0e; background:#1f160a }
 .banner.spade { border-color:#2b3550; background:#0d1320 }
 .banner.heart { border-color:#613344; background:#1a0f15 }
+.banner.action { border-color:#2b5aa1; background:#0f1b2c }
 @keyframes bannerIn { from{transform:translate(-50%,-8px); opacity:0} to{transform:translate(-50%,0); opacity:1} }
 
 /* Tutorial overlay */
@@ -211,6 +223,22 @@
   filter: grayscale(30%);
   transition: opacity .25s ease, filter .25s ease;
 }
+/* Construct preview slide/anim + badges */
+#constructPreview{ transform: translateY(8px); opacity:0; transition:opacity .18s ease, transform .18s ease }
+#constructPreview.on{ transform: none; opacity:1 }
+
+.badge{
+  display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px;
+  border:1px solid var(--border); background:#0d1522; color:var(--ink)
+}
+.badge.bad{ border-color:#5a2430; background:#1a0f15; color:var(--bad); font-weight:700 }
+.badge.good{ border-color:#1f6a4b; background:#0f2b1f; color:var(--ok); font-weight:700 }
+
+.suit-ico{ font-weight:900; margin-right:4px }
+.suit-ico.heart{ color:#ff6b7a }
+.suit-ico.club{ color:#5bd39b }
+.suit-ico.diamond{ color:#ffb347 }
+.suit-ico.spade{ color:#6cc4ff }
   </style>
 </head>
 <body>
@@ -563,7 +591,20 @@
       </div>
     </div>
   </div>
-
+<!-- === Game Over Modal === -->
+<div class="drawer" id="endModal" aria-label="Game Over" aria-hidden="true" role="dialog" aria-modal="true">
+  <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
+    <h3 id="endTitle" style="margin:0">Game Over</h3>
+    <button id="endClose" aria-label="Close">Close</button>
+  </header>
+  <div class="body" style="text-align:center">
+    <p id="endSub" style="margin-top:0;color:var(--sub)"></p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
+      <button id="endPlayAgain" class="btn-ok">▶️ Play Again</button>
+      <button id="endDismiss" class="btn-ghost">Dismiss</button>
+    </div>
+  </div>
+</div>
   <!-- Toast region -->
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
@@ -646,6 +687,14 @@ function suitBanner(suit, extra=''){
   const [cls, title] = map[suit] || ['','Suit bonus'];
   banner(`<div class="big">${title}</div><div class="sub">${extra}</div>`, cls);
 }
+    // === BEGIN ADD: actionBanner helper
+function actionBanner(title, sub=''){
+  banner(
+    `<div class="big">${title}</div>` + (sub?`<div class="sub">${sub}</div>`:''),
+    'action'
+  );
+}
+// === END ADD: actionBanner helper
   // Anim helpers
   function addAnim(el,cls,ms=400){
     if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
@@ -662,7 +711,21 @@ function suitBanner(suit, extra=''){
     const logEl=$('log'); if(!logEl) return;
     const last=logEl.lastElementChild; if(last) addAnim(last,'anim-flash',600);
   }
-
+// === BEGIN ADD: centralized win check ===
+function checkWinAfter(pid){
+  if (G.players[pid].score >= 60){
+    log(`${pid===0?'P1':'P2'} win (60)!`);
+    buzz(60);
+    G.started = false;
+    render(); saveState();
+    showEndModal(pid);
+    if (Net.isOnline() && Pref.role === 'host') sendSync(1);
+    return true;
+  }
+  return false;
+}
+    
+// === END ADD: centralized win check ===
   // Drawer helpers: focus, aria-hidden, ESC to close
   function markDrawerState(){const anyOpen=!!document.querySelector('.drawer.open');document.body.classList.toggle('drawer-open', anyOpen);}
   function openDrawer(el){
@@ -686,7 +749,27 @@ function suitBanner(suit, extra=''){
       if(open){ e.preventDefault(); closeDrawer(open); }
     }
   });
+// === BEGIN ADD: End-of-game modal wiring ===
+const endModal = $('endModal'),
+      endTitle = $('endTitle'),
+      endSub   = $('endSub');
 
+$('endClose').onclick    = ()=> closeDrawer(endModal);
+$('endDismiss').onclick  = ()=> closeDrawer(endModal);
+$('endPlayAgain').onclick = ()=>{
+  closeDrawer(endModal);
+  userAction({ type:'START', pid: myPid() });
+};
+
+function showEndModal(winnerPid){
+  const youWin = (winnerPid === myPid());
+  endTitle.textContent = youWin ? '🎉 You win!' : '😢 You lost';
+  endSub.textContent = youWin
+    ? `You reached 60 points. Final: You ${G.players[myPid()].score} — Opp ${G.players[1-myPid()].score}`
+    : `Opponent reached 60 points. Final: You ${G.players[myPid()].score} — Opp ${G.players[1-myPid()].score}`;
+  openDrawer(endModal);
+}
+// === END ADD: End-of-game modal wiring ===
   // === STATE SERIALIZATION (with masking) ===
   function serialize(){
     return JSON.stringify({deck:G.deck,discard:G.discard,players:G.players,turn:G.turn,started:G.started,clubChain:G.clubChain});
@@ -917,7 +1000,11 @@ function ensureMyTurnUI(){
     const myTurn = G.started && (G.turn === myPid());
     $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
     $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
-    $('turnTag').textContent=G.started?(G.turn===myPid()?'Your turn':(Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn'))):'—';
+    const myTurnNow = G.started && (G.turn === myPid());
+$('turnTag').textContent = G.started
+  ? (myTurnNow ? 'Your turn' : (Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn')))
+  : '—';
+$('turnTag').classList.toggle('my-turn', myTurnNow);
     $('modeTag').textContent = Pref.mode==='online' ? (Pref.role.toUpperCase() + ' • ' + (Net.connected?'ONLINE':'OFFLINE')) : ('SOLO • ' + Pref.ai.toUpperCase());
 updateConstructPreview();
     const yh=$('yourHand'), ah=$('aiHand'); yh.innerHTML=''; ah.innerHTML='';
@@ -1231,6 +1318,7 @@ function updateConstructPreview(){
   const cards = currentSelected(pid);
 
   // reset UI
+  host.classList.remove('on');
   host.style.display = 'none';
   btn.style.display = 'none';
   extraEl.style.display = 'none';
@@ -1242,37 +1330,48 @@ function updateConstructPreview(){
   const res = validateConstruct(cards);
 
   host.style.display = 'flex';
+  requestAnimationFrame(()=> host.classList.add('on')); // slide/fade-in
+
   if (res.valid){
     kindEl.textContent = res.kind.replace('_',' ');
 
-// build the points note first
-let note = `+${res.points}`;
-if (res.suitBonus==='HEARTS')   note += ' (♥ +3)';
-if (res.suitBonus==='CLUBS')    note += ' (♣ extra turn)';
-if (res.suitBonus==='DIAMONDS') note += ' (♦ steal)';
-if (res.suitBonus==='SPADES')   note += ' (♠ steal cards)';
+    // suit icon (if any)
+    let suitIcon = '';
+    if (res.suitBonus === 'HEARTS')   suitIcon = '<span class="suit-ico heart">♥</span>';
+    if (res.suitBonus === 'CLUBS')    suitIcon = '<span class="suit-ico club">♣</span>';
+    if (res.suitBonus === 'DIAMONDS') suitIcon = '<span class="suit-ico diamond">♦</span>';
+    if (res.suitBonus === 'SPADES')   suitIcon = '<span class="suit-ico spade">♠</span>';
 
-// append page penalty if applicable
-if (res.valid && res.kind!=='PAGE_ONLY' && (res.pagePenalty||0) > 0){
-  note += ` (−${res.pagePenalty} Pages)`;
-}
+    // points: base + notes
+    let note = `${suitIcon}<strong>+${res.points}</strong>`;
+    if (res.suitBonus==='HEARTS')   note += ' (♥ +3)';
+    if (res.suitBonus==='CLUBS')    note += ' (♣ extra turn)';
+    if (res.suitBonus==='DIAMONDS') note += ' (♦ steal)';
+    if (res.suitBonus==='SPADES')   note += ' (♠ steal cards)';
 
-ptsEl.textContent = note;
+    // page penalty badge
+    if (res.valid && res.kind!=='PAGE_ONLY' && (res.pagePenalty||0) > 0){
+      note += ` <span class="badge bad">−${res.pagePenalty} Page${res.pagePenalty>1?'s':''}</span>`;
+    }
+
+    ptsEl.innerHTML = note;
     ptsEl.classList.remove('preview-bad'); ptsEl.classList.add('preview-good');
 
     if (res.jokersUsed>0 && res.kind!=='PAGE_ONLY'){
       extraEl.style.display = 'inline-block';
+      extraEl.className = 'pill';
       extraEl.textContent = `Pay Page cost: discard ${res.jokersUsed}`;
     }
 
-    // glow selected
+    // glow the selection
     $('yourHand').querySelectorAll('.card.selected').forEach(n=>n.classList.add('preview-glow'));
     btn.style.display = (G.turn===pid) ? 'inline-block' : 'none';
   } else {
     kindEl.textContent = 'Not a construct';
     ptsEl.textContent = '—';
     ptsEl.classList.remove('preview-good'); ptsEl.classList.add('preview-bad');
-    whyEl.style.display = 'inline'; whyEl.textContent = res.reason || 'Invalid';
+    whyEl.style.display = 'inline';
+    whyEl.textContent = res.reason || 'Invalid';
   }
 }
 $('previewPlay').onclick = ()=>{
@@ -1364,7 +1463,7 @@ if (check.suitBonus === 'SPADES')  suitBanner('♠', 'Steal up to 2 random cards
         }
 if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
         const extraTurn=(check.suitBonus==='CLUBS');
-        if(G.players[pid].score>=60){ log(`${pid===0?'P1':'P2'} win (60)!`); buzz(60); G.started=false; render(); saveState(); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)} return }
+        if (checkWinAfter(pid)) return;
 
        if(extraTurn){
   // clear any stale selections from the construct before the bonus turn
@@ -1397,24 +1496,26 @@ if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
       }
 
             case 'ACTION_7': {
-        const c=discardFromHandById(pid,act.cardId);
-        if(!c){ log('7: invalid card.'); return }
-        log(`${pid===0?'P1':'P2'} played 7 [${cardLabel(c)}] (Ace can attempt to block).`);
-        if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
-        G.selected.clear(); return queryAce('A7',pid,1-pid,{cardId:act.cardId});
-      }
+  const c=discardFromHandById(pid,act.cardId);
+  if(!c){ log('7: invalid card.'); return }
+  log(`${pid===0?'P1':'P2'} played 7 [${cardLabel(c)}] (Ace can attempt to block).`);
+  actionBanner('🎯 Action 7', 'Ace can attempt to block');
+  if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
+  G.selected.clear(); return queryAce('A7',pid,1-pid,{cardId:act.cardId});
+}
 
             case 'ACTION_9': {
-        const giveCard=G.players[pid].hand.find(c=>c.id===act.giveId);
-        if(!giveCard){ log('9: invalid give card.'); return }
-        const nine=G.players[pid].hand.find(c=>c.id===act.cardId && c.rank==='9');
-        if(!nine){ log('9: invalid 9.'); return }
-        discardFromHandById(pid,nine.id);
-        takeFromHandById(pid,giveCard.id);
-        log(`${pid===0?'P1':'P2'} played 9 [${cardLabel(nine)}] (Ace can attempt to block).`);
-        if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
-        G.selected.clear(); return queryAce('A9',pid,1-pid,{give:giveCard});
-      }
+  const giveCard=G.players[pid].hand.find(c=>c.id===act.giveId);
+  if(!giveCard){ log('9: invalid give card.'); return }
+  const nine=G.players[pid].hand.find(c=>c.id===act.cardId && c.rank==='9');
+  if(!nine){ log('9: invalid 9.'); return }
+  discardFromHandById(pid,nine.id);
+  takeFromHandById(pid,giveCard.id);
+  log(`${pid===0?'P1':'P2'} played 9 [${cardLabel(nine)}] (Ace can attempt to block).`);
+  actionBanner('🎯 Action 9', 'Ace can attempt to block');
+  if (pid===0){ Telemetry.player.actions++; markPlayerTurn('action'); }
+  G.selected.clear(); return queryAce('A9',pid,1-pid,{give:giveCard});
+}
 
       case 'SIGIL': {
         const s=G.players[pid].hand.find(c=>c.id===act.cardId && isJQK(c.rank));
@@ -1441,7 +1542,8 @@ log(`Sigil ${r}: waiting for defender...`); return;
                 if(act.mode==='points'){
           const add=(r==='J'?1:r==='Q'?2:3);
           G.players[pid].score+=add; bumpScore(pid);
-          log(`${pid===0?'P1':'P2'} played ${r} [${cardLabel(s)}] → +${add}.`);
+if (checkWinAfter(pid)) return;
+log(`${pid===0?'P1':'P2'} played ${r} [${cardLabel(s)}] → +${add}.`);
         } else {
           const drawN=(r==='K'?2:1);
           draw(pid,drawN);
@@ -1450,14 +1552,7 @@ log(`Sigil ${r}: waiting for defender...`); return;
 
         if (pid===0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
         
-        if (G.players[pid].score >= 60) {
-  log(`${pid===0?'P1':'P2'} win (60)!`);
-  buzz(60);
-  G.started = false;
-  render(); saveState();
-  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
-  return;
-}
+        if (checkWinAfter(pid)) return;
         G.selected.clear(); endTurn(); return;
       }
 
@@ -1469,14 +1564,7 @@ log(`Sigil ${r}: waiting for defender...`); return;
 
 if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
         
-        if (G.players[pid].score >= 60) {
-  log(`${pid===0?'P1':'P2'} win (60)!`);
-  buzz(60);
-  G.started = false;
-  render(); saveState();
-  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
-  return;
-}
+        if (checkWinAfter(pid)) return;
         G.selected.clear(); endTurn(); return;
       }
     }
@@ -1486,18 +1574,36 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
       // If the human (target===0) did not use an Ace when prompted/possible, lower belief.
   if (target === 0) believeMissedChance();
     if(kind==='A7'){
-      const th=G.players[target].hand;
-      if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('7: stole a random card.'); toast('<div>7 resolved: stole a random card</div>') }
-      else log('7: defender had no cards.');
-      return endTurn();
-    }
+  const th=G.players[target].hand;
+  if(th.length>0){ 
+    const j=rnd(th.length); 
+    const c=th.splice(j,1)[0]; 
+    G.players[actor].hand.push(c); 
+    log('7: stole a random card.'); 
+    toast('<div>7 resolved: stole a random card</div>');
+    actionBanner('🎯 7 Resolved', 'Stole a random card');
+  } else {
+    log('7: defender had no cards.');
+    actionBanner('🎯 7 Resolved', 'No cards to steal');
+  }
+  return endTurn();
+}
     if(kind==='A9'){
-      const th=G.players[target].hand;
-      if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[actor].hand.push(c); log('9: swapped one card.'); toast('<div>9 resolved: swapped one card</div>') }
-      else log('9: defender had no cards.');
-      if (info && info.give) G.players[target].hand.push(info.give);
-      return endTurn();
-    }
+  const th=G.players[target].hand;
+  if(th.length>0){ 
+    const j=rnd(th.length); 
+    const c=th.splice(j,1)[0]; 
+    G.players[actor].hand.push(c); 
+    log('9: swapped one card.'); 
+    toast('<div>9 resolved: swapped one card</div>');
+    actionBanner('🎯 9 Resolved', 'Swapped one card');
+  } else {
+    log('9: defender had no cards.');
+    actionBanner('🎯 9 Resolved', 'No cards to take');
+  }
+  if (info && info.give) G.players[target].hand.push(info.give);
+  return endTurn();
+}
     if(kind==='ASIG'){
       const {rank,mode}=info||{};
        if(mode==='points'){
@@ -1512,14 +1618,7 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
 
       if (actor === 0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
       
-      if (G.players[actor].score >= 60) {
-  log(`${actor===0?'P1':'P2'} win (60)!`);
-  buzz(60);
-  G.started = false;
-  render(); saveState();
-  if (Net.isOnline() && Pref.role === 'host') { sendSync(1); }
-  return;
-}
+      if (checkWinAfter(actor)) return;
       return endTurn();
     }
   }
@@ -1544,12 +1643,22 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
       const use=aiWantsAce(target);
       if(!use) return aceResolveNoUse(kind,actor,target,info);
       const roll=1+Math.floor(Math.random()*6);
-      if(roll<=3){ log(`Ace block (d6=${roll}) → FAIL.`);
-toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`); return aceResolveNoUse(kind,actor,target,info) }
-      else { spendNAces(target,1); G.players[target].score+=1; bumpScore(target); if (kind === 'A9' && info && info.give) {
-  G.discard.push(info.give);
-} log(`Ace block (d6=${roll}) → BLOCKED +1.`);
-toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`); return endTurn() }
+      if(roll<=3){ 
+  log(`Ace block (d6=${roll}) → FAIL.`);
+  toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+  actionBanner('🂱 Ace Block Failed');
+  return aceResolveNoUse(kind,actor,target,info);
+}
+      else { 
+  spendNAces(target,1); 
+  G.players[target].score+=1; 
+  bumpScore(target); 
+  if (kind === 'A9' && info && info.give) { G.discard.push(info.give); }
+  log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+  toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+  actionBanner('🛡️ Ace Blocked', '+1 point');
+  return endTurn();
+}
     }
   }
 
@@ -2016,21 +2125,23 @@ const heat = gameHeat();
       }
       const roll = 1 + Math.floor(Math.random()*6);
       if (roll <= 3){
-        log(`Ace block (d6=${roll}) → FAIL.`);
-        toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
-        G.aceQuery = null;
-        aceResolveNoUse(kind, actor, target, info);
-        return;
-      }
+  log(`Ace block (d6=${roll}) → FAIL.`);
+  toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+  actionBanner('🂱 Ace Block Failed');
+  G.aceQuery = null;
+  aceResolveNoUse(kind, actor, target, info);
+  return;
+}
       spendNAces(1,1);
-      G.players[1].score += 1;
-      bumpScore(1);
-      if (kind === 'A9' && info && info.give) G.discard.push(info.give);
-      log(`Ace block (d6=${roll}) → BLOCKED +1.`);
-      toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-      G.aceQuery = null;
-      endTurn();
-      return;
+G.players[1].score += 1;
+bumpScore(1);
+if (kind === 'A9' && info && info.give) G.discard.push(info.give);
+log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+actionBanner('🛡️ Ace Blocked', '+1 point');
+G.aceQuery = null;
+endTurn();
+return;
     }
   }
 
@@ -2116,28 +2227,32 @@ closeAceDrawer(); G.aceQuery=null; return endTurn();
     if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
     const roll=1+Math.floor(Math.random()*6);
     if(roll<=3){
-      log(`Ace block (d6=${roll}) → FAIL.`); toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
-      if(q.kind==='A7'){
-        const th=G.players[q.target].hand;
-        if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log(`7: stole a random card.`) }
-        else log('7: defender had no cards.');
-      } else {
-        const th=G.players[q.target].hand;
-        if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log('9: swapped one card.') }
-        else log('9: defender had no cards.');
-        if (q.info && q.info.give) {
-  G.players[q.target].hand.push(q.info.give);
+  log(`Ace block (d6=${roll}) → FAIL.`);
+  toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+  actionBanner('🂱 Ace Block Failed');
+  if(q.kind==='A7'){
+    const th=G.players[q.target].hand;
+    if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log(`7: stole a random card.`) }
+    else log('7: defender had no cards.');
+  } else {
+    const th=G.players[q.target].hand;
+    if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log('9: swapped one card.') }
+    else log('9: defender had no cards.');
+    if (q.info && q.info.give) { G.players[q.target].hand.push(q.info.give); }
+  }
+  closeAceDrawer(); G.aceQuery=null; return endTurn();
 }
-      }
-      closeAceDrawer(); G.aceQuery=null; return endTurn();
     } else {
-      spendNAces(myPid(),1); G.players[myPid()].score+=1; bumpScore(myPid());
-      if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
-      log(`Ace block (d6=${roll}) → BLOCKED +1.`); toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-      notePlayerAceBlockSuccess();
-       believeSawOneAce();
-      closeAceDrawer(); G.aceQuery=null; return endTurn();
-    }
+      else {
+  spendNAces(myPid(),1); G.players[myPid()].score+=1; bumpScore(myPid());
+  if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
+  log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+  toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+  actionBanner('🛡️ Ace Blocked', '+1 point');
+  notePlayerAceBlockSuccess();
+  believeSawOneAce();
+  closeAceDrawer(); G.aceQuery=null; return endTurn();
+}
   };
 
   // Sigil Drawer
