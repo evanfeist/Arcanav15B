@@ -211,7 +211,7 @@
 }
 #tutorialDots .dot.on{ background:#6cc4ff; }
     .coach {
-  position:absolute; z-index:120; pointer-events:none;
+  position:absolute; z-index:120; /* pointer-events:none;  <-- remove this */
   background:rgba(15,24,38,.95); border:1px solid var(--border);
   padding:10px 12px; border-radius:12px; max-width:240px; box-shadow:var(--shadow)
 }
@@ -363,6 +363,7 @@
     <span id="previewKind" class="pill">—</span>
     <span id="previewPoints" class="preview-good">—</span>
     <span id="previewExtras" class="pill" style="display:none"></span>
+    <span id="previewBreakdown" class="pill" style="display:none"></span>
     <span id="previewWhy" class="preview-bad" style="display:none"></span>
   </div>
   <button type="button" id="previewPlay" class="btn-ok" style="display:none">Play Construct</button>
@@ -1497,6 +1498,7 @@ function updateConstructPreview(){
   btn.style.display = 'none';
   extraEl.style.display = 'none';
   whyEl.style.display = 'none';
+  const bdEl = $('previewBreakdown'); if (bdEl) bdEl.style.display = 'none';
   document.querySelectorAll('.card.selected').forEach(n=>n.classList.remove('preview-glow'));
 
   if (!cards || cards.length < 2) return;
@@ -1536,15 +1538,16 @@ function updateConstructPreview(){
       extraEl.className = 'pill';
       extraEl.textContent = `Pay Page cost: discard ${res.jokersUsed}`;
     }
-// breakdown chip: base + suit − pages
+// breakdown chip: base + suit − pages (stable node, no duplicates)
 let basePts = res.points;
 if (res.suitBonus === 'HEARTS') basePts -= 3; // only hearts changes point total directly
 const pagePen = res.pagePenalty || 0;
 const suitTxt = res.suitBonus ? ` • Suit: ${res.suitBonus}` : '';
-const bd = document.createElement('span');
-bd.className = 'pill';
-bd.textContent = `Base: ${basePts}${suitTxt}${pagePen?` • Pages: −${pagePen}`:''}`;
-extraEl.after(bd);
+const bd = $('previewBreakdown');
+if (bd){
+  bd.style.display = 'inline-block';
+  bd.textContent = `Base: ${basePts}${suitTxt}${pagePen?` • Pages: −${pagePen}`:''}`;
+}
 
 // preview suit glow on the hand region
 if (res.suitBonus){
@@ -2597,11 +2600,12 @@ $('tutorialNext').onclick = ()=>{
     steps[i].classList.remove('active');
     steps[i+1].classList.add('active');
     updateTutorialDots(i+1);
-  } else {
+  }   } else {
     if ($('tutorialDontShow').checked) localStorage.setItem(TUTO_KEY, '1');
     closeDrawer($('tutorialDrawer'));
+    // start Coach after tutorial finishes
+    if (typeof Coach !== 'undefined') Coach.start();
   }
-};
 
 $('tutorialPrev').onclick = ()=>{
   const steps = Array.from($('tutorialDrawer').querySelectorAll('.step'));
