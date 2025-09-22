@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Arcana — Solo vs AI / Online (Mobile-First)</title>
+  <title>Arcana: Luck Favors the Clever</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f16" />
 
@@ -34,7 +34,14 @@
     .tile h4{margin:0 0 4px 0;color:var(--sub);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
     .tile .v{font-size:22px;font-weight:700}
 
-    .hand{display:flex;flex-wrap:wrap;gap:10px;padding:12px}
+   .hand{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:12px;
+  content-visibility:auto;
+  contain-intrinsic-size:auto 220px;
+}
     .card{
       width:var(--cardW, clamp(64px, 22vw, 92px));
       aspect-ratio:var(--cardRatio);
@@ -249,7 +256,7 @@
     <div class="col" id="leftCol">
       <header class="sticky bar">
         <div style="display:flex;align-items:center;gap:8px">
-          <button id="btnSettings" title="Settings" class="btn-ghost" aria-label="Open settings">⚙️</button>
+          <button type="button" id="btnSettings" title="Settings" class="btn-ghost" aria-label="Open settings">⚙️</button>
           <h3>Arcana — Solo / Online</h3>
         </div>
         <span class="pill" id="turnTag" aria-live="polite">—</span>
@@ -264,13 +271,13 @@
 
       <div class="panel desktop-actions">
         <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
-          <button id="btnStart" class="btn-ok">▶️ Start</button>
-          <button id="btnRules" class="btn-accent" aria-controls="rulesDrawer">📜 Rules</button> 
-          <button id="btnTutorial" class="btn-accent">❔ Tutorial</button>
-          <button id="btnConstruct">🧩 Construct</button>
-          <button id="btnAction">🎯 Action (6/7/9)</button>
-          <button id="btnSigil">✨ Sigil (J/Q/K)</button>
-          <button id="btnDiscard" class="btn-warn">🗑️ Discard (+1)</button>
+          <button type="button" id="btnStart" class="btn-ok">▶️ Start</button>
+          <button type="button" id="btnRules" class="btn-accent" aria-controls="rulesDrawer">📜 Rules</button> 
+         <button type="button" id="btnTutorial" class="btn-accent">❔ Tutorial</button>
+         <button type="button" id="btnConstruct">🧩 Construct</button>
+         <button type="button" id="btnAction">🎯 Action (6/7/9)</button>
+          <button type="button" id="btnSigil">✨ Sigil (J/Q/K)</button>
+          <button type="button" id="btnDiscard" class="btn-warn">🗑️ Discard (+1)</button>
         </div>
       </div>
     </div>
@@ -291,7 +298,7 @@
     <span id="previewExtras" class="pill" style="display:none"></span>
     <span id="previewWhy" class="preview-bad" style="display:none"></span>
   </div>
-  <button id="previewPlay" class="btn-ok" style="display:none">Play Construct</button>
+  <button type="button" id="previewPlay" class="btn-ok" style="display:none">Play Construct</button>
 </div>
 <!-- End Construct Preview -->
 
@@ -308,7 +315,7 @@
         <h3>Activity</h3>
         <span class="pill" id="modeTag">—</span>
       </header>
-      <div class="log-collapser"><button id="toggleLog" aria-expanded="true">Hide activity</button></div>
+      <div class="log-collapser"><button type="button" id="oggleLog" aria-expanded="true">Hide activity</button></div>
       <div id="log" class="log" role="log" aria-live="polite"></div>
     </div>
   </div>
@@ -316,13 +323,13 @@
   <!-- Bottom Tabbar (mobile only) -->
   <nav class="tabbar" aria-label="Arcana actions">
     <div class="tray">
-      <button id="mbStart" class="btn-ok" aria-label="Start New">▶️ Start</button>
-      <button id="mbConstruct" aria-label="Play Construct">🧩 Construct</button>
-      <button id="mbAction" aria-label="Play Action">🎯 Action</button>
-      <button id="mbSigil" aria-label="Play Sigil">✨ Sigil</button>
-      <button id="mbDiscard" class="btn-warn" aria-label="Discard">🗑️ Discard</button>
-      <button id="mbRules" class="btn-accent" aria-label="Rules">📜 Rules</button>
-      <button id="mbTutorial" class="btn-accent" aria-label="Tutorial">❔ Tutorial</button>
+     <button type="button" id="mbStart" class="btn-ok" aria-label="Start New">▶️ Start</button>
+      <button type="button" id="mbConstruct" aria-label="Play Construct">🧩 Construct</button>
+     <button type="button" id="mbAction" aria-label="Play Action">🎯 Action</button>
+    <button type="button" id="mbSigil" aria-label="Play Sigil">✨ Sigil</button>
+    <button type="button" id="mbDiscard" class="btn-warn" aria-label="Discard">🗑️ Discard</button>
+ <button type="button" id="mbRules" class="btn-accent" aria-label="Rules">📜 Rules</button>
+  <button type="button" id="mbTutorial" class="btn-accent" aria-label="Tutorial">❔ Tutorial</button>
     </div>
   </nav>
 
@@ -331,7 +338,7 @@
     <header class="bar"><h3 style="margin:0">Swap — Choose one card to give</h3></header>
     <div class="body"><div id="giveGrid" class="grid"></div></div>
     <div class="panel" style="display:flex;justify-content:flex-end;gap:8px">
-      <button id="giveCancel">Cancel</button>
+     <button type="button" id="giveCancel">Cancel</button>
     </div>
   </div>
 
@@ -342,8 +349,8 @@
       <div id="payGrid" class="grid"></div>
     </div>
     <div class="panel" style="display:flex;justify-content:flex-end;gap:8px">
-      <button id="payCancel">Cancel</button>
-      <button id="payConfirm" class="btn-ok" disabled>Pay & Play</button>
+     <button type="button" id="payCancel">Cancel</button>
+     <button type="button" id="payConfirm" class="btn-ok" disabled>Pay & Play</button>
     </div>
   </div>
 
@@ -352,8 +359,8 @@
     <div class="body">
       <p id="acePrompt" style="margin-top:0;color:var(--sub)"></p>
       <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
-        <button id="aceYes" class="btn-ok">🛡️ Block (roll d6)</button>
-        <button id="aceNo" class="btn-warn">Let it resolve</button>
+       <button type="button" id="aceYes" class="btn-ok">🛡️ Block (roll d6)</button>
+     <button type="button" id="aceNo" class="btn-warn">Let it resolve</button>
       </div>
       <p style="margin:.5rem 0 0 0;font-size:12px;color:var(--sub)">
         On 7/9: 1–3 fail (action proceeds), 4–6 block + counter +1. On Sigil: discard 2 Aces to auto-block.
@@ -366,9 +373,9 @@
     <div class="body">
       <p id="sigilHint" style="margin-top:0;color:var(--sub)"></p>
       <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
-        <button id="sigilPoints" class="btn-ok">Score Points</button>
-        <button id="sigilDraw"  class="btn-accent">Draw Cards</button>
-        <button id="sigilCancel" class="btn-ghost">Cancel</button>
+        <button type="button" id="sigilPoints" class="btn-ok">Score Points</button>
+        <button type="button" id="sigilDraw"  class="btn-accent">Draw Cards</button>
+       <button type="button" id="sigilCancel" class="btn-ghost">Cancel</button>
       </div>
     </div>
   </div>
@@ -376,7 +383,7 @@
   <div class="drawer" id="rulesDrawer" aria-label="Rules" aria-modal="true" role="dialog" aria-hidden="true">
     <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
       <h3 style="margin:0">Rules</h3>
-      <button id="rulesClose" aria-label="Close rules">Close</button>
+     <button type="button" id="rulesClose" aria-label="Close rules">Close</button>
     </header>
     <div class="body" style="font-size:14px;color:var(--sub)">
       <div style="display:grid;gap:10px">
@@ -499,7 +506,7 @@
     <div id="tutorialDots" aria-hidden="true">
       <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
     </div>
-    <button id="tutorialClose" aria-label="Close tutorial">Close</button>
+   <button type="button" id="tutorialClose" aria-label="Close tutorial">Close</button>
   </header>
   <div class="body" style="font-size:14px;color:var(--sub)">
     <div class="step active">
@@ -524,8 +531,8 @@
         <input type="checkbox" id="tutorialDontShow"> Don’t show again
       </label>
       <div style="display:flex;gap:8px">
-        <button id="tutorialPrev">Back</button>
-        <button id="tutorialNext" class="btn-ok">Next</button>
+     <button type="button" id="tutorialPrev">Back</button>
+       <button type="button" id="tutorialNext" class="btn-ok">Next</button>
       </div>
     </div>
   </div>
@@ -535,7 +542,7 @@
   <div class="drawer" id="settingsDrawer" aria-label="Settings" aria-hidden="true">
     <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
       <h3 style="margin:0">Settings</h3>
-      <button id="settingsClose" aria-label="Close settings">Close</button>
+     <button type="button" id="settingsClose" aria-label="Close settings">Close</button>
     </header>
     <div class="body" style="font-size:14px;color:var(--sub)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -580,14 +587,14 @@
         </label>
 
         <div style="grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap">
-          <button id="btnConnect" class="btn-ok">🔌 Connect</button>
-          <button id="btnDisconnect" class="btn-warn">❌ Disconnect</button>
+        <button type="button" id="btnConnect" class="btn-ok">🔌 Connect</button>
+          <button type="button" id="btnDisconnect" class="btn-warn">❌ Disconnect</button>
           <span id="netStatus" class="pill">Offline</span>
         </div>
       </div>
 
       <div class="panel" style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
-        <button id="resetGame" class="btn-warn">Reset game</button>
+       <button type="button" id="resetGame" class="btn-warn">Reset game</button>
       </div>
     </div>
   </div>
@@ -595,19 +602,19 @@
 <div class="drawer" id="endModal" aria-label="Game Over" aria-hidden="true" role="dialog" aria-modal="true">
   <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
     <h3 id="endTitle" style="margin:0">Game Over</h3>
-    <button id="endClose" aria-label="Close">Close</button>
+   <button type="button" id="endClose" aria-label="Close">Close</button>
   </header>
   <div class="body" style="text-align:center">
     <p id="endSub" style="margin-top:0;color:var(--sub)"></p>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
-      <button id="endPlayAgain" class="btn-ok">▶️ Play Again</button>
-      <button id="endDismiss" class="btn-ghost">Dismiss</button>
+     <button type="button" id="endPlayAgain" class="btn-ok">▶️ Play Again</button>
+      <button type="button" id="endDismiss" class="btn-ghost">Dismiss</button>
     </div>
   </div>
 </div>
   <!-- Toast region -->
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-
+<div id="srLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <div id="bannerHost" aria-live="polite" aria-atomic="true"></div>
   
   <!-- === GAME LOGIC + ONLINE SYNC === -->
@@ -728,21 +735,36 @@ function checkWinAfter(pid){
 // === END ADD: centralized win check ===
   // Drawer helpers: focus, aria-hidden, ESC to close
   function markDrawerState(){const anyOpen=!!document.querySelector('.drawer.open');document.body.classList.toggle('drawer-open', anyOpen);}
-  function openDrawer(el){
-    el.classList.add('open');
-    document.querySelectorAll('.drawer').forEach(d=>{
-      const active = d===el && d.classList.contains('open');
-      d.setAttribute('aria-hidden', String(!active));
-    });
-    markDrawerState();
-    const first = el.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
-    if (first) first.focus();
+  let _lastFocus = null;
+function openDrawer(el){
+  _lastFocus = document.activeElement;
+  el.classList.add('open');
+  document.querySelectorAll('.drawer').forEach(d=>{
+    d.setAttribute('aria-hidden', String(d!==el));
+  });
+  markDrawerState();
+
+  const focusables = el.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])');
+  if (focusables[0]) focusables[0].focus();
+
+  function trap(e){
+    if (e.key !== 'Tab') return;
+    const f = Array.from(el.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')).filter(x=>!x.disabled);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length-1];
+    if (e.shiftKey && document.activeElement === first){ last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last){ first.focus(); e.preventDefault(); }
   }
-  function closeDrawer(el){
-    el.classList.remove('open');
-    el.setAttribute('aria-hidden','true');
-    markDrawerState();
-  }
+  el.addEventListener('keydown', trap, { capture:true });
+  el._trap = trap;
+}
+function closeDrawer(el){
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden','true');
+  markDrawerState();
+  if (el._trap){ el.removeEventListener('keydown', el._trap, { capture:true }); el._trap = null; }
+  if (_lastFocus && document.body.contains(_lastFocus)) _lastFocus.focus();
+}
   document.addEventListener('keydown',(e)=>{
     if(e.key==='Escape'){
       const open=document.querySelector('.drawer.open');
@@ -1005,6 +1027,12 @@ $('turnTag').textContent = G.started
   ? (myTurnNow ? 'Your turn' : (Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn')))
   : '—';
 $('turnTag').classList.toggle('my-turn', myTurnNow);
+    if (G.started){
+  const live = $('srLive'); if (live){ live.textContent=''; setTimeout(()=> live.textContent = $('turnTag').textContent, 0); }
+}
+    if (G.started && G.clubChain > 0 && G.turn === myPid()){
+  $('turnTag').textContent = $('turnTag').textContent + ' • extra turn';
+}
     $('modeTag').textContent = Pref.mode==='online' ? (Pref.role.toUpperCase() + ' • ' + (Net.connected?'ONLINE':'OFFLINE')) : ('SOLO • ' + Pref.ai.toUpperCase());
 updateConstructPreview();
     const yh=$('yourHand'), ah=$('aiHand'); yh.innerHTML=''; ah.innerHTML='';
@@ -2154,6 +2182,10 @@ return;
   let _pendingPay=null;
   function openPayDrawer(pid,baseIds,need,poolCards){
     _pendingPay={pid,baseIds,need,poolIds:poolCards.map(c=>c.id),chosen:new Set()};
+    if (!poolCards || poolCards.length === 0){
+  toastSafe('No cards available for Page cost.');
+  return;
+}
     payHint.textContent=`Select ${need} card${need>1?'s':''} to discard (Page cost).`;
     payGrid.innerHTML='';
     poolCards.forEach(c=>{
@@ -2348,6 +2380,9 @@ $('tutorialClose').onclick = ()=>{
   if ($('tutorialDontShow').checked) localStorage.setItem(TUTO_KEY, '1');
   closeDrawer($('tutorialDrawer'));
 };
+    $('tutorialDontShow').addEventListener('change', (e)=>{
+  try{ localStorage.setItem(TUTO_KEY, e.target.checked ? '1' : ''); }catch{}
+});
   function syncSettingsUI(){ $('optHaptics').checked=Pref.haptics; $('optAnims').checked=Pref.anims; $('optSwipe').checked=Pref.swipe; $('optCardSize').value=Pref.cardSize; $('optAI').value=Pref.ai; $('optMode').value=Pref.mode; $('optRole').value=Pref.role; $('optRoom').value=Pref.room; $('netStatus').textContent=Net.connected?'Connected':'Offline' }
   function applySettings(){
     Pref.haptics=$('optHaptics').checked;
