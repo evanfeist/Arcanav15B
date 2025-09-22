@@ -2711,6 +2711,18 @@ function rankTip(c){
   if (r==='K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
   return 'Normal: make Sets, Runs, or Pairs. Same-suit Runs can trigger suit bonuses.';
 }
+      // === Unified userAction dispatcher ===
+  function userAction(act){
+    // Guest in online mode: send input to host
+    if (Pref.mode === 'online' && Pref.role === 'guest'){
+      sendSig({ kind:'INPUT', act });
+      return;
+    }
+    // Solo or Host: apply immediately
+    applyAction(act);
+    // If host is online, keep guest in sync
+    if (Net.isOnline() && Pref.role === 'host') sendSync(1);
+  }
   </script>
 </body>
 </html>
