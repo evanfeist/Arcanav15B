@@ -2213,47 +2213,89 @@ return;
     G.aceQuery=null; 
     aceResolveNoUse(q.kind,q.actor,q.target,q.info);
   };
-  aceYes.onclick=()=>{ if(!G.aceQuery) return closeAceDrawer(); const q=G.aceQuery;
-    if(q.kind==='ASIG'){
-      if(haveNAces(myPid(),2)){
-        if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
-        spendNAces(myPid(),2); log(`Sigil blocked by 2 Aces → Sigil discarded.`); toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
-notePlayerAceBlockSuccess();
-        believeSawTwoAces();
-closeAceDrawer(); G.aceQuery=null; return endTurn();
-      } else { closeAceDrawer(); G.aceQuery=null; return }
-    }
-    if(!haveNAces(myPid(),1)){ closeAceDrawer(); G.aceQuery=null; return }
-    if(Pref.mode==='online' && Pref.role==='guest'){ closeAceDrawer(); sendSig({kind:'ACE_RESPONSE', use:true}); return }
-    const roll=1+Math.floor(Math.random()*6);
-    if(roll<=3){
-  log(`Ace block (d6=${roll}) → FAIL.`);
-  toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
-  actionBanner('🂱 Ace Block Failed');
-  if(q.kind==='A7'){
-    const th=G.players[q.target].hand;
-    if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log(`7: stole a random card.`) }
-    else log('7: defender had no cards.');
-  } else {
-    const th=G.players[q.target].hand;
-    if(th.length>0){ const j=rnd(th.length); const c=th.splice(j,1)[0]; G.players[q.actor].hand.push(c); log('9: swapped one card.') }
-    else log('9: defender had no cards.');
-    if (q.info && q.info.give) { G.players[q.target].hand.push(q.info.give); }
-  }
-  closeAceDrawer(); G.aceQuery=null; return endTurn();
-}
+  aceYes.onclick = () => {
+  if (!G.aceQuery) return closeAceDrawer();
+  const q = G.aceQuery;
+
+  if (q.kind === 'ASIG') {
+    // Need 2 Aces to autoblock a Sigil
+    if (haveNAces(myPid(), 2)) {
+      if (Pref.mode === 'online' && Pref.role === 'guest') {
+        closeAceDrawer();
+        sendSig({ kind: 'ACE_RESPONSE', use: true });
+        return;
+      }
+      spendNAces(myPid(), 2);
+      log(`Sigil blocked by 2 Aces → Sigil discarded.`);
+      toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
+      notePlayerAceBlockSuccess();
+      believeSawTwoAces();
+      closeAceDrawer();
+      G.aceQuery = null;
+      return endTurn();
     } else {
-      else {
-  spendNAces(myPid(),1); G.players[myPid()].score+=1; bumpScore(myPid());
-  if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
-  log(`Ace block (d6=${roll}) → BLOCKED +1.`);
-  toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-  actionBanner('🛡️ Ace Blocked', '+1 point');
-  notePlayerAceBlockSuccess();
-  believeSawOneAce();
-  closeAceDrawer(); G.aceQuery=null; return endTurn();
-}
-  };
+      closeAceDrawer();
+      G.aceQuery = null;
+      return;
+    }
+  }
+
+  // 7/9 roll-block path (needs 1 Ace)
+  if (!haveNAces(myPid(), 1)) { closeAceDrawer(); G.aceQuery = null; return; }
+
+  if (Pref.mode === 'online' && Pref.role === 'guest') {
+    closeAceDrawer();
+    sendSig({ kind: 'ACE_RESPONSE', use: true });
+    return;
+  }
+
+  const roll = 1 + Math.floor(Math.random() * 6);
+  if (roll <= 3) {
+    // FAIL → action proceeds
+    log(`Ace block (d6=${roll}) → FAIL.`);
+    toast(`<div>🂱 Ace roll <span class='die'>${roll}</span> → fail</div>`);
+    actionBanner('🂱 Ace Block Failed');
+
+    if (q.kind === 'A7') {
+      const th = G.players[q.target].hand;
+      if (th.length > 0) {
+        const j = rnd(th.length);
+        const c = th.splice(j, 1)[0];
+        G.players[q.actor].hand.push(c);
+        log(`7: stole a random card.`);
+      } else {
+        log('7: defender had no cards.');
+      }
+    } else { // A9
+      const th = G.players[q.target].hand;
+      if (th.length > 0) {
+        const j = rnd(th.length);
+        const c = th.splice(j, 1)[0];
+        G.players[q.actor].hand.push(c);
+        log('9: swapped one card.');
+      } else {
+        log('9: defender had no cards.');
+      }
+      if (q.info && q.info.give) { G.players[q.target].hand.push(q.info.give); }
+    }
+
+    closeAceDrawer(); G.aceQuery = null; return endTurn();
+  } else {
+    // SUCCESS → spend Ace, +1, (for 9: discard the give)
+    spendNAces(myPid(), 1);
+    G.players[myPid()].score += 1;
+    bumpScore(myPid());
+    if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
+
+    log(`Ace block (d6=${roll}) → BLOCKED +1.`);
+    toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+    actionBanner('🛡️ Ace Blocked', '+1 point');
+    notePlayerAceBlockSuccess();
+    believeSawOneAce();
+
+    closeAceDrawer(); G.aceQuery = null; return endTurn();
+  }
+};
 
   // Sigil Drawer
   const sigilDrawer=$('sigilDrawer'), sigilPoints=$('sigilPoints'), sigilDraw=$('sigilDraw'), sigilCancel=$('sigilCancel');
