@@ -871,17 +871,18 @@ function showEndModal(winnerPid){
           this.hostId=Pref.room || ('room-'+Math.random().toString(36).slice(2,8));
           send({type:'host',hostId:this.hostId});
           toastSafe(`Room: ${this.hostId}`); log(`Hosting room: ${this.hostId}`);
-        }else{
+        }else{ showRoomUI(Net.hostId);
           this.hostId=Pref.room;
           if(!this.hostId){ log('Enter a Room/Host ID, then Connect.'); return; }
           send({type:'join',hostId:this.hostId});
           toastSafe(`Joining: ${this.hostId}`); log(`Joining room: ${this.hostId}`);
+              if (Pref.role !== 'host') hideRoomUI();
         }
         updateModeTag(); updateStartDisabled();
         Net.startHeartbeat();
       };
 
-      this.ws.onclose=()=>{
+      this.ws.onclose=()=>{ hideRoomUI();
         this.connected=false; this.connecting=false; $('netStatus').textContent='Offline';
         updateModeTag(); updateStartDisabled();
         Net.stopHeartbeat();
@@ -915,7 +916,7 @@ function showEndModal(winnerPid){
       updateModeTag(); updateStartDisabled();
       Net.stopHeartbeat();
       if (Net._reconnectTimer){ clearTimeout(Net._reconnectTimer); Net._reconnectTimer=null; }
-    },
+  hideRoomUI();  },
 
     // NEW: helpers
     startHeartbeat(){
@@ -2444,6 +2445,11 @@ $('tutorialClose').onclick = ()=>{
     document.body.classList.toggle('no-anim', !Pref.anims);
     updateModeTag();
     updateStartDisabled();
+    if (Pref.mode !== 'online' || Pref.role !== 'host') {
+  hideRoomUI();
+} else if (Net.hostId) {
+  showRoomUI(Net.hostId);
+}
   }
   $('optHaptics').onchange=applySettings; $('optAnims').onchange=applySettings; $('optSwipe').onchange=applySettings; $('optCardSize').onchange=applySettings; $('optAI').onchange=applySettings; $('optMode').onchange=applySettings; $('optRole').onchange=applySettings; $('optRoom').onchange=applySettings;
 
@@ -2533,20 +2539,7 @@ if (mbT) mbT.onclick = ()=> openDrawer($('tutorialDrawer'));
     $('btnConstruct').onclick = ()=>{
       const act = attemptConstruct(myPid());
       if (act) userAction(act);
-     // Copy Room button
-  const copyBtn = document.getElementById('btnCopyRoom');
-  if (copyBtn) {
-    copyBtn.onclick = async ()=>{
-      const text = Net.hostId || document.getElementById('optRoom').value.trim();
-      if (!text) { toastSafe('No room to copy'); return; }
-      try {
-        await navigator.clipboard.writeText(text);
-        toastSafe('Room copied to clipboard');
-      } catch {
-        toastSafe('Could not copy');
-      }
-    };
-  }
+    
     };
     $('btnAction').onclick = playSelectedAction;
     $('btnSigil').onclick  = playSelectedSigil;
@@ -2580,6 +2573,20 @@ if (mbT) mbT.onclick = ()=> openDrawer($('tutorialDrawer'));
         toggle.setAttribute('aria-expanded', String(!collapsed));
       };
     }
+ // Copy Room button
+  const copyBtn = document.getElementById('btnCopyRoom');
+  if (copyBtn) {
+    copyBtn.onclick = async ()=>{
+      const text = Net.hostId || document.getElementById('optRoom').value.trim();
+      if (!text) { toastSafe('No room to copy'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        toastSafe('Room copied to clipboard');
+      } catch {
+        toastSafe('Could not copy');
+      }
+    };
+  }
   }
 
   // === Boot ===
