@@ -4,7 +4,25 @@
   <meta charset="utf-8" />
   <title>Arcana: Luck Favors the Clever</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0f16" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+
+  <!-- Open Graph / Link Previews -->
+  <meta property="og:title" content="Arcana: Luck Favors the Clever">
+  <meta property="og:description" content="Build constructs, trigger suit bonuses, unleash sigils. First to 60 points wins.">
+  <meta property="og:image" content="https://yourusername.github.io/YourRepo/cards/arcana-preview.png">
+  <meta property="og:url" content="https://yourusername.github.io/YourRepo/">
+  <meta property="og:type" content="website">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Arcana: Luck Favors the Clever">
+  <meta name="twitter:description" content="Build constructs, trigger suit bonuses, unleash sigils. First to 60 points wins.">
+  <meta name="twitter:image" content="https://yourusername.github.io/YourRepo/cards/arcana-preview.png">
+
+  <!-- iOS Homescreen -->
+  <link rel="apple-touch-icon" href="cards/arcana-preview.png">
 
   <style>
     :root{
@@ -1322,18 +1340,20 @@ if (pages.length > 0) {
     if(!check.valid){ log(check.reason||'Invalid construct'); return null }
 
     if(check.jokersUsed>0 && check.kind!=='PAGE_ONLY'){
-      const excluded=new Set(cards.map(c=>c.id));
-      const pool=G.players[pid].hand.filter(c=>!excluded.has(c.id)&&!isPage(c));
-      if(pool.length<check.jokersUsed){ log('Not enough cards to pay Page cost'); return null }
+  const excluded = new Set(cards.map(c=>c.id));
+  const pool = G.players[pid].hand.filter(c => !excluded.has(c.id) && !isPage(c));
+  if (pool.length < check.jokersUsed){ log('Not enough cards to pay Page cost'); return null }
 
-      if(Pref.mode==='solo' || pid!==myPid()){
-        pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
-        const extras=pool.slice(0,check.jokersUsed).map(c=>c.id);
-        return {type:'CONSTRUCT',pid,ids:cards.map(c=>c.id),extras,info:check};
-      } else {
-        openPayDrawer(pid,cards.map(c=>c.id),check.jokersUsed,pool); return null;
-      }
-    }
+  // Human chooses; only AI auto-picks.
+  if (pid !== myPid()){
+    pool.sort((a,b)=>RVAL(a.rank)-RVAL(b.rank));
+    const extras = pool.slice(0, check.jokersUsed).map(c=>c.id);
+    return { type:'CONSTRUCT', pid, ids:cards.map(c=>c.id), extras, info:check };
+  } else {
+    openPayDrawer(pid, cards.map(c=>c.id), check.jokersUsed, pool);
+    return null;
+  }
+}
     return {type:'CONSTRUCT',pid,ids:cards.map(c=>c.id),extras:[],info:check};
   }
 function updateConstructPreview(){
