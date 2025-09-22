@@ -267,6 +267,34 @@
 .suit-ico.club{ color:#5bd39b }
 .suit-ico.diamond{ color:#ffb347 }
 .suit-ico.spade{ color:#6cc4ff }
+    /* Play-out animation */
+@keyframes playOut {
+  0%   { transform: translateY(0) scale(1);   opacity: 1 }
+  60%  { transform: translateY(-12px) scale(1.03); opacity: 1 }
+  100% { transform: translateY(-18px) scale(0.96); opacity: 0 }
+}
+.card.anim-play-out {
+  animation: playOut .22s ease forwards;
+  pointer-events: none;
+}
+    /* === Suit Bonus Glow === */
+.hand { position: relative }
+
+.hand.suit-glow::after{
+  content:""; position:absolute; inset:-6px; border-radius:16px;
+  opacity:1; pointer-events:none;
+  animation: suitGlow .8s ease;
+}
+.hand.suit-glow.heart::after   { box-shadow: 0 0 0 3px rgba(255,107,122,.85), 0 0 24px rgba(255,107,122,.45) }
+.hand.suit-glow.club::after    { box-shadow: 0 0 0 3px rgba(91,211,155,.85), 0 0 24px rgba(91,211,155,.45) }
+.hand.suit-glow.diamond::after { box-shadow: 0 0 0 3px rgba(255,179,71,.85),  0 0 24px rgba(255,179,71,.45) }
+.hand.suit-glow.spade::after   { box-shadow: 0 0 0 3px rgba(108,196,255,.85), 0 0 24px rgba(108,196,255,.45) }
+
+@keyframes suitGlow {
+  0%   { opacity: 0; transform: scale(.98) }
+  15%  { opacity: 1; transform: scale(1) }
+  100% { opacity: 0; transform: scale(1.01) }
+}
   </style>
 </head>
 <body>
@@ -1133,7 +1161,10 @@ function hideRoomUI(){
 }
   function cardNode(c,show){
     const d=document.createElement('div');
-    d.className='card';
+d.className='card';
+if (show && typeof c.id === 'number') {
+  d.dataset.id = String(c.id);
+}
     const t=typeOf(c);
 
     if(show){
@@ -1485,11 +1516,39 @@ $('previewPlay').onclick = ()=>{
       case 'START': startNew(); if(Net.isOnline() && Pref.role==='host'){ sendSync(1) } return;
 
       case 'CONSTRUCT': {
-        const cards=removeFromHandByIds(pid,act.ids); const check=validateConstruct(cards);
-        if(!check.valid){ G.players[pid].hand.push(...cards); log('Invalid construct (check)'); render(); return }
-        if(check.kind!=='PAGE_ONLY' && check.jokersUsed>0){
-          const extraCards=removeFromHandByIds(pid,act.extras);
-          if(extraCards.length!==check.jokersUsed){ G.players[pid].hand.push(...cards,...extraCards); log('Page cost mismatch'); render(); return }
+  const cards = removeFromHandByIds(pid, act.ids);
+  const check = validateConstruct(cards);
+
+  if (!check.valid) {
+    G.players[pid].hand.push(...cards);
+    log('Invalid construct (check)');
+    render();
+    return;
+  }
+
+  // Score points
+  G.players[pid].score += check.points;
+  bumpScore(pid);
+  log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`);
+
+  // Suit bonus trigger
+  if (check.suit) {
+    log(`${check.suit} bonus triggered!`);
+    if (pid === myPid()) suitPulse(check.suit);  // 🔥 glow effect
+  }
+
+  // Discard played cards
+  G.discard.push(...cards);
+
+  G.selected.clear();
+  if (G.players[pid].score >= 60) {
+    log(`${pid===0?'P1':'P2'} win (60)!`);
+    G.started = false;
+  } else {
+    endTurn();
+  }
+  return;
+}
           G.discard.push(...extraCards);
           log(`Paid Page cost: discarded ${extraCards.length}.`);
         }
@@ -2466,16 +2525,58 @@ $('tutorialClose').onclick = ()=>{
         ? (Pref.role.toUpperCase() + ' • ' + (Net.connected ? 'ONLINE' : 'OFFLINE'))
         : ('SOLO • ' + Pref.ai.toUpperCase());
   }
+function animExit(ids=[], done){
+  if (!ids.length){ done(); return; }
+  const host = $('yourHand');
+  const nodes = ids
+    .map(id => host.querySelector(`.card[data-id="${id}"]`))
+    .filter(Boolean);
+  if (!nodes.length){ done(); return; }
+  nodes.forEach(n => n.classList.add('anim-play-out'));
+  setTimeout(done, 230); // wait for animation
+}
 
+function idsForAction(act){
+  switch (act.type){
+    case 'CONSTRUCT': return (act.ids || []).slice();
+    case 'ACTION_6':
+    case 'ACTION_7':
+    case 'SIGIL':
+    case 'DISCARD':   return [act.cardId];
+    case 'ACTION_9':  return [act.cardId];
+    default: return [];
+  }
+function suitPulse(suit){
+  const h = document.getElementById('yourHand');
+  const map = { '♥':'heart', '♣':'club', '♦':'diamond', '♠':'spade' };
+  const cls = map[suit]; if (!cls) return;
+  h.classList.remove('heart','club','diamond','spade','suit-glow');
+  requestAnimationFrame(()=>{
+    h.classList.add('suit-glow', cls);
+    setTimeout(()=> h.classList.remove('suit-glow', cls), 820);
+  });
+}
+}
   // Route local vs online (guest sends INPUT to host)
-  function userAction(act){
-    if (Pref.mode === 'online' && Pref.role === 'guest' && Net.isOnline()){
-      sendSig({ kind: 'INPUT', act });
-      return;
-    }
+ function userAction(act){
+  if (Pref.mode === 'online' && Pref.role === 'guest' && Net.isOnline()){
+    sendSig({ kind:'INPUT', act });
+    return;
+  }
+
+  const mine = act && act.pid === myPid();
+  const toAnim = mine ? idsForAction(act) : [];
+
+  if (toAnim.length){
+    animExit(toAnim, ()=>{
+      applyAction(act);
+      if (Net.isOnline() && Pref.role === 'host') sendSync(1);
+    });
+  } else {
     applyAction(act);
     if (Net.isOnline() && Pref.role === 'host') sendSync(1);
   }
+}
 
   // === UI wiring ===
   function selectedOne(){
