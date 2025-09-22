@@ -1516,7 +1516,11 @@ $('previewPlay').onclick = ()=>{
       case 'START': startNew(); if(Net.isOnline() && Pref.role==='host'){ sendSync(1) } return;
 
       case 'CONSTRUCT': {
-  const cards = removeFromHandByIds(pid, act.ids);
+  const pid = act.pid;
+  const opp = 1 - pid;
+
+  // pull the base cards
+  const cards = removeFromHandByIds(pid, act.ids || []);
   const check = validateConstruct(cards);
 
   if (!check.valid) {
@@ -1526,100 +1530,102 @@ $('previewPlay').onclick = ()=>{
     return;
   }
 
-  // Score points
+  // pay Page cost if any (extras were chosen)
+  if (act.extras && act.extras.length) {
+    const extraCards = removeFromHandByIds(pid, act.extras);
+    G.discard.push(...extraCards);
+    log(`Paid Page cost: discarded ${extraCards.length}.`);
+  }
+
+  // score + log the play
   G.players[pid].score += check.points;
   bumpScore(pid);
-  log(`${pid===0?'P1':'P2'} played ${check.kind} for +${check.points}.`);
+  G.discard.push(...cards);
+  log(`${pid===0?'P1':'P2'} played ${check.kind} [${labelList(cards)}] for +${check.points}.`); 
+  buzz(20);
 
-  // Suit bonus trigger
-  if (check.suit) {
-    log(`${check.suit} bonus triggered!`);
-    if (pid === myPid()) suitPulse(check.suit);  // 🔥 glow effect
+  // page penalty note (non Page-only)
+  if (check.kind!=='PAGE_ONLY' && (check.pagePenalty||0) > 0){
+    log(`Page penalty −${check.pagePenalty}.`);
   }
 
-  // Discard played cards
-  G.discard.push(...cards);
+  // suit-bonus logs + banner
+  if (check.suitBonus === 'HEARTS')   { log('♥ bonus: +3.');                     suitBanner('♥', '+3 points'); }
+  if (check.suitBonus === 'CLUBS')    { log('♣ bonus: extra turn.');             suitBanner('♣', 'Take another turn (cap 2)'); }
+  if (check.suitBonus === 'DIAMONDS') { log('♦ bonus: steal points.');           suitBanner('♦', 'Roll d6 to steal 1–3'); }
+  if (check.suitBonus === 'SPADES')   { log('♠ bonus: steal up to 2 cards.');    suitBanner('♠', 'Steal up to 2 random cards'); }
+
+  // 🔔 local glow only when an actual suit bonus fired
+  if (pid === myPid() && check.suitBonus) {
+    suitPulse(check.suit);
+  }
+
+  // page-only bonuses
+  if (check.kind === 'PAGE_ONLY'){
+    if (check.bonus && check.bonus.draw){
+      draw(pid, check.bonus.draw);
+      log(`Drew ${check.bonus.draw}.`);
+    }
+    if (check.bonus && check.bonus.refill){
+      const need = Math.max(0, 7 - G.players[pid].hand.length);
+      if (need > 0){ draw(pid, need); log('Refilled to 7.'); }
+    }
+  }
+
+  // diamonds: steal points (d6 → 1/2/3)
+  if (check.suitBonus === 'DIAMONDS'){
+    const roll = 1 + Math.floor(Math.random()*6);
+    const steal = (roll<=2)?1:(roll<=4)?2:3;
+    const give = Math.min(steal, G.players[opp].score);
+    G.players[opp].score -= give;
+    G.players[pid].score += give;
+    bumpScore(pid);
+    log(`♦ d6=${roll} → stole ${give}.`);
+    toast(`<div>♦ Diamonds roll: <span class="die">${roll}</span> → +${give}</div>`);
+  }
+
+  // spades: steal up to 2 random cards
+  if (check.suitBonus === 'SPADES'){
+    const oppH = G.players[opp].hand;
+    for (let i=0; i<2 && oppH.length>0; i++){
+      const j = rnd(oppH.length);
+      const c = oppH.splice(j,1)[0];
+      G.players[pid].hand.push(c);
+    }
+    log(`♠ stole up to 2 random card(s).`);
+    toast(`<div>♠ Stole up to 2 random cards</div>`);
+  }
+
+  // telemetry
+  if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
+
+  // win check
+  if (checkWinAfter(pid)) return;
+
+  // clubs: extra turn handling (cap 2)
+  if (check.suitBonus === 'CLUBS'){
+    G.selected.clear();
+    render();
+
+    endOfTurnDraw(pid); // still draw 1 at end of that turn
+    G.clubChain = (G.turn===pid ? G.clubChain+1 : 1);
+    if (G.clubChain <= 2){
+      log(`${pid===0?'P1':'P2'} take an extra turn (${G.clubChain}/2).`);
+      ensureMyTurnUI();
+      render(); maybeSafetyDraw(); saveState();
+      if (Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn, 380);
+      if (Net.isOnline() && Pref.role==='host'){ sendSync(1) }
+      return;
+    } else {
+      log(`Clubs extra-turn cap reached (2); passing turn.`);
+      G.clubChain = 0;
+    }
+  }
 
   G.selected.clear();
-  if (G.players[pid].score >= 60) {
-    log(`${pid===0?'P1':'P2'} win (60)!`);
-    G.started = false;
-  } else {
-    endTurn();
-  }
+  endTurn();
   return;
 }
-          G.discard.push(...extraCards);
-          log(`Paid Page cost: discarded ${extraCards.length}.`);
-        }
-        G.players[pid].score+=check.points; bumpScore(pid);
-        G.discard.push(...cards);
-          log(`${pid===0?'P1':'P2'} played ${check.kind} [${labelList(cards)}] for +${check.points}.`); buzz(20);
-        if (check.kind!=='PAGE_ONLY' && (check.pagePenalty||0) > 0){
-  log(`Page penalty −${check.pagePenalty}.`);
-}
-        
-        // Explicit suit-bonus logs
-if (check.suitBonus === 'HEARTS')   log('♥ bonus: +3.');
-if (check.suitBonus === 'CLUBS')    log('♣ bonus: extra turn.');
-if (check.suitBonus === 'DIAMONDS') log('♦ bonus: steal points.');
-if (check.suitBonus === 'SPADES')   log('♠ bonus: steal up to 2 cards.');
-
-if (check.suitBonus === 'HEARTS')  suitBanner('♥', '+3 points');
-if (check.suitBonus === 'CLUBS')   suitBanner('♣', 'Take another turn (cap 2)');
-if (check.suitBonus === 'DIAMONDS') suitBanner('♦', 'Roll d6 to steal 1–3');
-if (check.suitBonus === 'SPADES')  suitBanner('♠', 'Steal up to 2 random cards');
-        
-        if(check.kind==='PAGE_ONLY'){
-          if (check.bonus && check.bonus.draw) {
-  draw(pid, check.bonus.draw);
-  log(`Drew ${check.bonus.draw}.`);
-}
-          if (check.bonus && check.bonus.refill) {
-  const need = Math.max(0, 7 - G.players[pid].hand.length);
-  if (need > 0) {
-    draw(pid, need);
-    log('Refilled to 7.');
-  }
-}
-        }
-        if(check.suitBonus==='DIAMONDS'){
-          const roll=1+Math.floor(Math.random()*6);
-          const steal=(roll<=2)?1:(roll<=4)?2:3;
-          const give=Math.min(steal,G.players[opp].score);
-          G.players[opp].score-=give; G.players[pid].score+=give; bumpScore(pid);
-          log(`♦ d6=${roll} → stole ${give}.`); toast(`<div>♦ Diamonds roll: <span class="die">${roll}</span> → +${give}</div>`);
-        }
-        if(check.suitBonus==='SPADES'){
-          const oppH=G.players[opp].hand;
-          for(let i=0;i<2 && oppH.length>0;i++){ const j=rnd(oppH.length); const c=oppH.splice(j,1)[0]; G.players[pid].hand.push(c) }
-          log(`♠ stole up to 2 random card(s).`); toast(`<div>♠ Stole up to 2 random cards</div>`);
-        }
-if (pid===0){ Telemetry.player.constructs++; markPlayerTurn('construct'); }
-        const extraTurn=(check.suitBonus==='CLUBS');
-        if (checkWinAfter(pid)) return;
-
-       if(extraTurn){
-  // clear any stale selections from the construct before the bonus turn
-  G.selected.clear();
-  render(); // update ARIA pressed states/visuals
-
-  endOfTurnDraw(pid); // you still draw 1 at the end of that construct turn
-  G.clubChain=(G.turn===pid ? G.clubChain+1 : 1);
-  if(G.clubChain<=2){
-    log(`${pid===0?'P1':'P2'} take an extra turn (${G.clubChain}/2).`);
-    ensureMyTurnUI();
-    render(); maybeSafetyDraw(); saveState();
-    if(Pref.mode==='solo' && pid===1) setTimeout(aiTakeTurn,380);
-    if(Net.isOnline() && Pref.role==='host'){ sendSync(1) }
-    return;
-  } else {
-    log(`Clubs extra-turn cap reached (2); passing turn.`); G.clubChain=0;
-  }
-}
-        G.selected.clear(); endTurn(); return;
-      }
-
       case 'ACTION_6': {
         const c=discardFromHandById(pid,act.cardId);
         if(!c){ log('6: invalid card.'); return }
@@ -2546,36 +2552,18 @@ function idsForAction(act){
     case 'ACTION_9':  return [act.cardId];
     default: return [];
   }
+}
+
 function suitPulse(suit){
   const h = document.getElementById('yourHand');
   const map = { '♥':'heart', '♣':'club', '♦':'diamond', '♠':'spade' };
-  const cls = map[suit]; if (!cls) return;
+  const cls = map[suit];
+  if (!cls || !h) return;
   h.classList.remove('heart','club','diamond','spade','suit-glow');
   requestAnimationFrame(()=>{
     h.classList.add('suit-glow', cls);
     setTimeout(()=> h.classList.remove('suit-glow', cls), 820);
   });
-}
-}
-  // Route local vs online (guest sends INPUT to host)
- function userAction(act){
-  if (Pref.mode === 'online' && Pref.role === 'guest' && Net.isOnline()){
-    sendSig({ kind:'INPUT', act });
-    return;
-  }
-
-  const mine = act && act.pid === myPid();
-  const toAnim = mine ? idsForAction(act) : [];
-
-  if (toAnim.length){
-    animExit(toAnim, ()=>{
-      applyAction(act);
-      if (Net.isOnline() && Pref.role === 'host') sendSync(1);
-    });
-  } else {
-    applyAction(act);
-    if (Net.isOnline() && Pref.role === 'host') sendSync(1);
-  }
 }
 
   // === UI wiring ===
