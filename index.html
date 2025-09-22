@@ -210,6 +210,15 @@
   width:8px; height:8px; border-radius:999px; background:#263243; border:1px solid var(--border)
 }
 #tutorialDots .dot.on{ background:#6cc4ff; }
+    .coach {
+  position:absolute; z-index:120; pointer-events:none;
+  background:rgba(15,24,38,.95); border:1px solid var(--border);
+  padding:10px 12px; border-radius:12px; max-width:240px; box-shadow:var(--shadow)
+}
+.coach .k {display:inline-block; padding:2px 6px; border:1px solid var(--border); border-radius:8px; font-size:11px; color:var(--sub)}
+.coach-arrow {position:absolute; width:0;height:0;border:8px solid transparent}
+.coach[data-at="top"]   .coach-arrow{bottom:-16px; left:12px; border-top-color:var(--border)}
+.coach[data-at="bottom"] .coach-arrow{top:-16px; left:12px; border-bottom-color:var(--border)}
     /* Card rank tooltips */
 .card .rank[data-tip]{ position:relative; cursor:help }
 .card .rank[data-tip]:focus::after,
@@ -294,6 +303,15 @@
   0%   { opacity: 0; transform: scale(.98) }
   15%  { opacity: 1; transform: scale(1) }
   100% { opacity: 0; transform: scale(1.01) }
+}
+    .card.hint {
+  outline:2px dashed var(--accent);
+  outline-offset:2px;
+  box-shadow:0 0 0 2px rgba(108,196,255,.25);
+}
+.card.hint.bad {
+  outline-color: var(--bad);
+  box-shadow:0 0 0 2px rgba(255,107,122,.25)
 }
   </style>
 </head>
@@ -673,6 +691,7 @@
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="srLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <div id="bannerHost" aria-live="polite" aria-atomic="true"></div>
+  <div id="coachHost" aria-hidden="true"></div>
   
   <!-- === GAME LOGIC + ONLINE SYNC === -->
   <script>
@@ -759,6 +778,52 @@ function actionBanner(title, sub=''){
   );
 }
 // === END ADD: actionBanner helper
+    // === BEGIN ADD: Coach (guided tutorial callouts) ===
+const Coach = {
+  on:false, step:0, el:$('coachHost'),
+  steps:[
+    {id:'btnStart',    text:'Tap <b>Start</b> to deal 7 cards and begin.', at:'bottom'},
+    {id:'yourHand',    text:'Select cards to try a <b>Construct</b> (Pair, Set, Run).', at:'top'},
+    {id:'btnConstruct',text:'When valid, press <b>Construct</b> to score it.', at:'top'},
+    {id:'btnAction',   text:'Use <b>Actions</b> (6/7/9) for tempo or disruption.', at:'top'}
+  ],
+  show(){
+    const host=this.el; host.innerHTML='';
+    const s=this.steps[this.step]; if(!s) return;
+    const t=document.getElementById(s.id); if(!t) return;
+    const r=t.getBoundingClientRect();
+    const c=document.createElement('div'); c.className='coach'; c.dataset.at=s.at;
+    c.innerHTML=`<div>${s.text}</div>
+      <div style="margin-top:6px;display:flex;gap:8px">
+        <button id="coachPrev">Back</button>
+        <button id="coachNext" class="btn-ok">Next</button>
+      </div>
+      <div class="coach-arrow"></div>`;
+    this.el.appendChild(c);
+
+    const y = (s.at==='bottom') ? r.bottom + 8 + window.scrollY : r.top - c.offsetHeight - 8 + window.scrollY;
+    const x = r.left + Math.min(0, (r.width-240)/2) + window.scrollX;
+    Object.assign(c.style,{position:'absolute', top:y+'px', left:x+'px'});
+
+    $('coachPrev').onclick = ()=>{ this.step=Math.max(0,this.step-1); this.show(); };
+    $('coachNext').onclick = ()=>{ 
+      if (this.step < this.steps.length-1){ this.step++; this.show(); }
+      else { this.stop(); toastSafe('Tutorial complete!'); }
+    };
+  },
+  start(){ this.on=true; this.step=0; this.el.setAttribute('aria-hidden','false'); this.show(); },
+  stop(){ this.on=false; this.el.innerHTML=''; this.el.setAttribute('aria-hidden','true'); }
+};
+// Auto-start coach mode when the last “Tutorial” pane closes
+(function wireCoachFromTutorial(){
+  const oldNext = $('tutorialNext').onclick;
+  $('tutorialNext').onclick = ()=>{
+    if (typeof oldNext === 'function') oldNext();
+    const isOpen = $('tutorialDrawer').classList.contains('open');
+    if (!isOpen) Coach.start();
+  };
+})();
+// === END ADD: Coach (guided tutorial callouts) ===
   // Anim helpers
   function addAnim(el,cls,ms=400){
     if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
@@ -1137,6 +1202,8 @@ if (myTurn) {
 
     // Buttons
 if (!myTurn && G.selected.size) G.selected.clear(); // prevent ghost selections across turns
+    $('yourHand').querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
+paintHints();
 ensureMyTurnUI();
 updateStartDisabled();
   }
@@ -1202,7 +1269,8 @@ if (show && typeof c.id === 'number') {
     const on=G.selected.has(id);
     if(on){ G.selected.delete(id); node.classList.remove('selected'); node.setAttribute('aria-pressed','false') }
     else { G.selected.add(id); node.classList.add('selected'); node.setAttribute('aria-pressed','true') }
-updateConstructPreview();  
+updateConstructPreview();
+paintHints();
 }
   function typeOf(c){
     if(isPage(c)) return 'Page';
@@ -1468,7 +1536,29 @@ function updateConstructPreview(){
       extraEl.className = 'pill';
       extraEl.textContent = `Pay Page cost: discard ${res.jokersUsed}`;
     }
+// breakdown chip: base + suit − pages
+let basePts = res.points;
+if (res.suitBonus === 'HEARTS') basePts -= 3; // only hearts changes point total directly
+const pagePen = res.pagePenalty || 0;
+const suitTxt = res.suitBonus ? ` • Suit: ${res.suitBonus}` : '';
+const bd = document.createElement('span');
+bd.className = 'pill';
+bd.textContent = `Base: ${basePts}${suitTxt}${pagePen?` • Pages: −${pagePen}`:''}`;
+extraEl.after(bd);
 
+// preview suit glow on the hand region
+if (res.suitBonus){
+  const map = {HEARTS:'heart',CLUBS:'club',DIAMONDS:'diamond',SPADES:'spade'};
+  const cls = map[res.suitBonus] || '';
+  const h = $('yourHand');
+  h.classList.remove('heart','club','diamond','spade','suit-glow');
+  if (cls){
+    requestAnimationFrame(()=>{
+      h.classList.add('suit-glow', cls);
+      setTimeout(()=> h.classList.remove('suit-glow', cls), 650);
+    });
+  }
+}
     // glow the selection
     $('yourHand').querySelectorAll('.card.selected').forEach(n=>n.classList.add('preview-glow'));
     btn.style.display = (G.turn===pid) ? 'inline-block' : 'none';
@@ -1484,6 +1574,41 @@ $('previewPlay').onclick = ()=>{
   const act = attemptConstruct(myPid());
   if (act) userAction(act);
 };
+    // === BEGIN ADD: selection-time hinting ===
+function computeHints(pid, selectedIds){
+  const hand = G.players[pid].hand;
+  const selected = hand.filter(c => selectedIds.has(c.id));
+  const pool = hand.filter(c => !selectedIds.has(c.id));
+
+  if (selected.length === 0){ return { good:new Set(), bad:new Set() }; }
+
+  const good = new Set(), bad = new Set();
+  for (const cand of pool){
+    const test = [...selected, cand];
+    const res = validateConstruct(test);
+    if (res.valid) good.add(cand.id); else bad.add(cand.id);
+  }
+  return { good, bad };
+}
+function paintHints(){
+  const pid = myPid();
+  const host = $('yourHand');
+  host.querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
+
+  const {good, bad} = computeHints(pid, G.selected);
+
+  good.forEach(id=>{
+    const n = host.querySelector(`.card[data-id="${id}"]`);
+    if (n) n.classList.add('hint');
+  });
+  if (G.selected.size >= 2){
+    bad.forEach(id=>{
+      const n = host.querySelector(`.card[data-id="${id}"]`);
+      if (n) n.classList.add('hint','bad');
+    });
+  }
+}
+// === END ADD: selection-time hinting ===
   // LOG
   function log(s){
     const el=$('log'); if(el){ const d=document.createElement('div'); d.className='line'; d.textContent=s; el.appendChild(d); el.scrollTop=el.scrollHeight; flashLogLast() }
