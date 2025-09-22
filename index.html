@@ -7,6 +7,7 @@
 
   <!-- Theme & description -->
   <meta name="theme-color" content="#0b0f16" />
+  <link rel="manifest" href="manifest.webmanifest">
   <meta name="description" content="Every suit has power, every play has risk — can you reach 60 first?">
   <link rel="canonical" href="https://evanfeist.github.io/Arcanav15B/">
 
@@ -17,8 +18,17 @@
   <meta name="apple-mobile-web-app-title" content="Arcana">
 
   <!-- Icons -->
-  <link rel="icon" href="cards/back.png" type="image/png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+ <!-- Favicons (PNG + WEBP) -->
+<link rel="icon" href="cards/back.png" type="image/png">
+<link rel="icon" href="cards/back.webp" type="image/webp">
+
+<!-- Apple touch icon (avoid leading slash so it works on GH Pages subpath) -->
+<link rel="apple-touch-icon" href="cards/back.png">
+
+<!-- Social preview (will work, though not the ideal 1200×630 ratio) -->
+<meta property="og:image" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
+<meta property="og:image:secure_url" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
+<meta name="twitter:image" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Arcana: Fortune Favors the Clever">
@@ -2865,5 +2875,10 @@ function rankTip(c){
     if (Net.isOnline() && Pref.role === 'host') sendSync(1);
   }
   </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
 </body>
 </html>
