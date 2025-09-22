@@ -333,9 +333,12 @@
     <!-- Right column: Log -->
     <div class="col">
       <header class="sticky bar">
-        <h3>Activity</h3>
-        <span class="pill" id="modeTag">—</span>
-      </header>
+  <h3>Activity</h3>
+  <div style="display:flex;gap:6px;align-items:center">
+    <span class="pill" id="modeTag">—</span>
+    <span class="pill" id="peerTag" style="display:none">—</span>
+  </div>
+</header>
       <div class="log-collapser"><button type="button" id="toggleLog" aria-expanded="true">Hide activity</button></div>
       <div id="log" class="log" role="log" aria-live="polite"></div>
     </div>
@@ -613,6 +616,11 @@
           <span id="netStatus" class="pill">Offline</span>
         </div>
       </div>
+      <!-- Room display + copy -->
+<div style="grid-column:1 / -1; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+  <span id="roomDisplay" class="pill" style="display:none"></span>
+  <button type="button" id="btnCopyRoom" class="btn-accent" style="display:none">Copy room</button>
+</div>
 
       <div class="panel" style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
        <button type="button" id="resetGame" class="btn-warn">Reset game</button>
@@ -834,6 +842,7 @@ function showEndModal(winnerPid){
     const Net={
     ws:null, connected:false, hostId:null, connecting:false,
     _sendRaw:null,
+      peerReady:false,
 
     // NEW: reconnect + heartbeat state
     _wanted:false,
@@ -1106,7 +1115,21 @@ updateStartDisabled();
     const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
     ['btnStart','mbStart'].forEach(id=>{ const el=$(id); if(el){ el.disabled=shouldDisableStart; el.setAttribute('aria-disabled', String(shouldDisableStart)) }})
   }
+function showRoomUI(id){
+  const d = document.getElementById('roomDisplay');
+  const c = document.getElementById('btnCopyRoom');
+  if (!d || !c) return;
+  d.textContent = `Room: ${id}`;
+  d.style.display = '';
+  c.style.display = '';
+}
 
+function hideRoomUI(){
+  const d = document.getElementById('roomDisplay');
+  const c = document.getElementById('btnCopyRoom');
+  if (d) d.style.display = 'none';
+  if (c) c.style.display = 'none';
+}
   function cardNode(c,show){
     const d=document.createElement('div');
     d.className='card';
@@ -2510,6 +2533,20 @@ if (mbT) mbT.onclick = ()=> openDrawer($('tutorialDrawer'));
     $('btnConstruct').onclick = ()=>{
       const act = attemptConstruct(myPid());
       if (act) userAction(act);
+     // Copy Room button
+  const copyBtn = document.getElementById('btnCopyRoom');
+  if (copyBtn) {
+    copyBtn.onclick = async ()=>{
+      const text = Net.hostId || document.getElementById('optRoom').value.trim();
+      if (!text) { toastSafe('No room to copy'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        toastSafe('Room copied to clipboard');
+      } catch {
+        toastSafe('Could not copy');
+      }
+    };
+  }
     };
     $('btnAction').onclick = playSelectedAction;
     $('btnSigil').onclick  = playSelectedSigil;
