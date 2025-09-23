@@ -2856,13 +2856,12 @@ function suitPulse(suit){
     } else {
       render(); // empty boards
     }
-// Auto-open tutorial the first time (reset to step 1 + dot #1)
+// Auto-open tutorial the first time (but do NOT toggle tutorial mode globally)
 if (!localStorage.getItem(TUTO_KEY)) {
-  setTimeout(()=>{
-    const steps = $('tutorialDrawer').querySelectorAll('.step');
-    steps.forEach((s,i)=> s.classList.toggle('active', i===0));
-    updateTutorialDots(0);
+  setTimeout(()=> {
     openDrawer($('tutorialDrawer'));
+    // mark as shown so it won’t auto-open again
+    localStorage.setItem(TUTO_KEY, '1');
   }, 400);
 }  })();
 
