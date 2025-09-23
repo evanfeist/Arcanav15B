@@ -25,10 +25,17 @@
 <!-- Apple touch icon (avoid leading slash so it works on GH Pages subpath) -->
 <link rel="apple-touch-icon" href="cards/back.png">
 
-<!-- Social preview (will work, though not the ideal 1200×630 ratio) -->
-<meta property="og:image" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
-<meta property="og:image:secure_url" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
-<meta name="twitter:image" content="https://evanfeist.github.io/Arcanav15B/cards/back.png">
+  <!-- Social preview (1200×630 recommended) -->
+  <meta property="og:image" content="https://evanfeist.github.io/Arcanav15B/cards/social-card.png">
+  <meta property="og:image:secure_url" content="https://evanfeist.github.io/Arcanav15B/cards/social-card.png">
+  <meta name="twitter:image" content="https://evanfeist.github.io/Arcanav15B/cards/social-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Arcana — a strategic card game">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Legacy crawlers -->
+  <link rel="image_src" href="https://evanfeist.github.io/Arcanav15B/cards/social-card.png">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Arcana: Fortune Favors the Clever">
@@ -470,7 +477,7 @@
     </div>
   </div>
 
-  <div class="drawer" id="rulesDrawer" aria-label="Rules" aria-modal="true" role="dialog" aria-hidden="true">
+  <div class="drawer" id="rulesDrawer" aria-label="Rules" aria-hidden="true">
     <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
       <h3 style="margin:0">Rules</h3>
      <button type="button" id="rulesClose" aria-label="Close rules">Close</button>
@@ -874,30 +881,25 @@ function checkWinAfter(pid){
     
 // === END ADD: centralized win check ===
   // Drawer helpers: focus, aria-hidden, ESC to close
+    // --- Adaptive drawer a11y: modal on mobile overlay; complementary on desktop ---
+function adjustDrawerA11y(el){
+  if (!el) return;
+  if (window.innerWidth < 900) {             // matches your CSS breakpoint
+    el.setAttribute('role','dialog');
+    el.setAttribute('aria-modal','true');
+  } else {
+    el.setAttribute('role','complementary');
+    el.removeAttribute('aria-modal');
+  }
+}
+
+function applyAllDrawerA11y(){
+  document.querySelectorAll('.drawer').forEach(adjustDrawerA11y);
+}
+// -------------------------------------------------------------------------------
   function markDrawerState(){const anyOpen=!!document.querySelector('.drawer.open');document.body.classList.toggle('drawer-open', anyOpen);}
   let _lastFocus = null;
 function openDrawer(el){
-  _lastFocus = document.activeElement;
-  el.classList.add('open');
-  document.querySelectorAll('.drawer').forEach(d=>{
-    d.setAttribute('aria-hidden', String(d!==el));
-  });
-  markDrawerState();
-
-  const focusables = el.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])');
-  if (focusables[0]) focusables[0].focus();
-
-  function trap(e){
-    if (e.key !== 'Tab') return;
-    const f = Array.from(el.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')).filter(x=>!x.disabled);
-    if (!f.length) return;
-    const first = f[0], last = f[f.length-1];
-    if (e.shiftKey && document.activeElement === first){ last.focus(); e.preventDefault(); }
-    else if (!e.shiftKey && document.activeElement === last){ first.focus(); e.preventDefault(); }
-  }
-  el.addEventListener('keydown', trap, { capture:true });
-  el._trap = trap;
-}
 function closeDrawer(el){
   el.classList.remove('open');
   el.setAttribute('aria-hidden','true');
@@ -911,6 +913,8 @@ function closeDrawer(el){
       if(open){ e.preventDefault(); closeDrawer(open); }
     }
   });
+  // Keep drawer a11y in sync with layout changes
+window.addEventListener('resize', applyAllDrawerA11y);
 // === BEGIN ADD: End-of-game modal wiring ===
 const endModal = $('endModal'),
       endTitle = $('endTitle'),
@@ -2850,7 +2854,31 @@ function suitPulse(suit){
     adjustCardSize();
     updateModeTag();
     wireButtons();
+(function init(){
+  loadPrefs();
+  // Respect reduced motion on first load
+  if (!Pref.anims) document.body.classList.add('no-anim');
 
+  adjustCardSize();
+  updateModeTag();
+  wireButtons();
+
+  applyAllDrawerA11y(); // <-- add this line
+
+  // Load saved game or start fresh UI
+  if (loadState()){
+    render();
+  } else {
+    render(); // empty boards
+  }
+  // Auto-open tutorial …
+  if (!localStorage.getItem(TUTO_KEY)) {
+    setTimeout(()=> {
+      openDrawer($('tutorialDrawer'));
+      localStorage.setItem(TUTO_KEY, '1');
+    }, 400);
+  }
+})();
     // Load saved game or start fresh UI
     if (loadState()){
       render();
