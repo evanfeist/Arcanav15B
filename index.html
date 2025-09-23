@@ -149,8 +149,13 @@
     }
     .tabbar .tray{
   display:grid;
-  grid-template-columns:repeat(7,1fr); /* was 6 */
+  grid-template-columns: repeat(4, 1fr); /* phones: wrap to 2 rows */
   gap:10px;
+}
+@media (min-width: 420px){
+  .tabbar .tray{
+    grid-template-columns: repeat(7, 1fr); /* wider screens: single row */
+  }
 }
     .tabbar button{padding:12px 8px;border-radius:12px}
     body.drawer-open .tabbar{transform:translateY(120%);opacity:0;pointer-events:none}
@@ -334,6 +339,24 @@
   outline-color: var(--bad);
   box-shadow:0 0 0 2px rgba(255,107,122,.25)
 }
+    /* Make overlay hosts non-blocking */
+#coachHost{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* host ignores clicks */
+}
+.coach{
+  pointer-events: auto;   /* the actual bubble can be clicked */
+}
+
+/* Suit/bonus banner host should not block taps either */
+#bannerHost{
+  pointer-events: none;
+}
+
+/* Drawers only catch clicks when open */
+.drawer{ pointer-events: none; }
+.drawer.open{ pointer-events: auto; }
   </style>
 </head>
 <body>
