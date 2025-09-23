@@ -43,7 +43,6 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://evanfeist.github.io/Arcanav15B/">
   <meta property="og:site_name" content="Arcana">
-  <meta property="og:image:alt" content="Arcana — a strategic card game">
   <meta property="og:locale" content="en_US">
 
   <!-- Twitter (optional but nice) -->
@@ -51,6 +50,8 @@
   <meta name="twitter:title" content="Arcana: Fortune Favors the Clever">
   <meta name="twitter:description" content="Every suit has power, every play has risk — can you reach 60 first?">
 
+<link rel="preload" as="image" href="cards/back.webp">
+  
   <style>
     :root{
       --bg:#0b0f16; --panel:#121a24; --panel-2:#0e1520; --ink:#dfe7f5;
@@ -411,7 +412,7 @@
   </div>
 </header>
       <div class="log-collapser"><button type="button" id="toggleLog" aria-expanded="true">Hide activity</button></div>
-      <div id="log" class="log" role="log" aria-live="polite"></div>
+      <div id="log" class="log" role="log" aria-live="off"></div>
     </div>
   </div>
 
@@ -1207,20 +1208,19 @@ function ensureMyTurnUI(){
     el.setAttribute('aria-disabled', String(!myTurn));
   });
 }
-  function render(){
-    const myTurn = G.started && (G.turn === myPid());
-    $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
-    $('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
-    const myTurnNow = G.started && (G.turn === myPid());
+  const myTurn = G.started && (G.turn === myPid());
+$('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
+$('scoreYou').textContent=G.players[myPid()].score; $('scoreAI').textContent=G.players[1-myPid()].score;
 $('turnTag').textContent = G.started
-  ? (myTurnNow ? 'Your turn' : (Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn')))
+  ? (myTurn ? 'Your turn' : (Pref.mode==='online'?'Their turn':(G.turn===0?'Your turn':'AI turn')))
   : '—';
-$('turnTag').classList.toggle('my-turn', myTurnNow);
+$('turnTag').classList.toggle('my-turn', myTurn);
     if (G.started){
   const live = $('srLive'); if (live){ live.textContent=''; setTimeout(()=> live.textContent = $('turnTag').textContent, 0); }
 }
     if (G.started && G.clubChain > 0 && G.turn === myPid()){
-  $('turnTag').textContent = $('turnTag').textContent + ' • extra turn';
+  const n = Math.min(2, G.clubChain); // cap display at 2
+  $('turnTag').textContent = $('turnTag').textContent + ` • extra turn (${n}/2)`;
 }
     $('modeTag').textContent = Pref.mode==='online' ? (Pref.role.toUpperCase() + ' • ' + (Net.connected?'ONLINE':'OFFLINE')) : ('SOLO • ' + Pref.ai.toUpperCase());
 updateConstructPreview();
@@ -1674,6 +1674,11 @@ function paintHints(){
       if (n) n.classList.add('hint','bad');
     });
   }
+  // remove hints from any card no longer in hand (edge cases)
+host.querySelectorAll('.card.hint').forEach(n => {
+  const id = Number(n.dataset.id);
+  if (!G.players[pid].hand.some(c => c.id === id)) n.classList.remove('hint','bad');
+});
 }
 // === END ADD: selection-time hinting ===
   // LOG
@@ -1734,6 +1739,12 @@ function paintHints(){
   bumpScore(pid);
   G.discard.push(...cards);
   log(`${pid===0?'P1':'P2'} played ${check.kind} [${labelList(cards)}] for +${check.points}.`); 
+        {
+  const base = (check.suitBonus==='HEARTS') ? (check.points - 3) : check.points;
+  const suitTxt = check.suitBonus ? ` + ${check.suitBonus.toLowerCase()}` : '';
+  const pageTxt = (check.pagePenalty||0) > 0 ? ` − ${check.pagePenalty} page${check.pagePenalty>1?'s':''}` : '';
+  log(`Breakdown: ${base}${suitTxt}${pageTxt}`);
+}
   buzz(20);
 
   // page penalty note (non Page-only)
@@ -1884,7 +1895,6 @@ log(`${pid===0?'P1':'P2'} played ${r} [${cardLabel(s)}] → +${add}.`);
 
         if (pid===0){ Telemetry.player.sigils++; markPlayerTurn('sigil'); }
         
-        if (checkWinAfter(pid)) return;
         G.selected.clear(); endTurn(); return;
       }
 
@@ -2925,6 +2935,13 @@ function suitPulse(suit){
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
   }
+</script>
+  <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
