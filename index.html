@@ -43,13 +43,11 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://evanfeist.github.io/Arcanav15B/">
   <meta property="og:site_name" content="Arcana">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Arcana — a strategic card game">
   <meta property="og:locale" content="en_US">
 
   <!-- Twitter (optional but nice) -->
-  <meta name="twitter:card" content="summary_large_image">
+
   <meta name="twitter:title" content="Arcana: Fortune Favors the Clever">
   <meta name="twitter:description" content="Every suit has power, every play has risk — can you reach 60 first?">
 
@@ -597,7 +595,7 @@
     </div>
   </div>
   
-<div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true" role="dialog" aria-modal="true">
+<div class="drawer" id="tutorialDrawer" aria-label="Tutorial" aria-hidden="true">
   <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
     <h3 style="margin:0">How to Play</h3>
     <div id="tutorialDots" aria-hidden="true">
@@ -707,7 +705,7 @@
     </div>
   </div>
 <!-- === Game Over Modal === -->
-<div class="drawer" id="endModal" aria-label="Game Over" aria-hidden="true" role="dialog" aria-modal="true">
+<div class="drawer" id="endModal" aria-label="Game Over" aria-hidden="true">
   <header class="bar" style="display:flex;align-items:center;justify-content:space-between">
     <h3 id="endTitle" style="margin:0">Game Over</h3>
    <button type="button" id="endClose" aria-label="Close">Close</button>
@@ -880,11 +878,10 @@ function checkWinAfter(pid){
 }
     
 // === END ADD: centralized win check ===
-  // Drawer helpers: focus, aria-hidden, ESC to close
-    // --- Adaptive drawer a11y: modal on mobile overlay; complementary on desktop ---
+ // Drawer helpers: focus, aria-hidden, ESC to close
 function adjustDrawerA11y(el){
   if (!el) return;
-  if (window.innerWidth < 900) {             // matches your CSS breakpoint
+  if (window.innerWidth < 900) {
     el.setAttribute('role','dialog');
     el.setAttribute('aria-modal','true');
   } else {
@@ -892,28 +889,62 @@ function adjustDrawerA11y(el){
     el.removeAttribute('aria-modal');
   }
 }
-
 function applyAllDrawerA11y(){
   document.querySelectorAll('.drawer').forEach(adjustDrawerA11y);
 }
-// -------------------------------------------------------------------------------
-  function markDrawerState(){const anyOpen=!!document.querySelector('.drawer.open');document.body.classList.toggle('drawer-open', anyOpen);}
-  let _lastFocus = null;
+
+function markDrawerState(){
+  const anyOpen = !!document.querySelector('.drawer.open');
+  document.body.classList.toggle('drawer-open', anyOpen);
+}
+
+let _lastFocus = null;
+
 function openDrawer(el){
+  if (!el) return;
+  adjustDrawerA11y(el);
+  _lastFocus = document.activeElement;
+
+  el.classList.add('open');
+  el.setAttribute('aria-hidden','false');
+  markDrawerState();
+
+  // simple focus trap
+  const trap = (e)=>{
+    if (e.key !== 'Tab') return;
+    const f = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const a = Array.from(f).filter(x=>!x.hasAttribute('disabled'));
+    if (!a.length) return;
+    const first = a[0], last = a[a.length-1];
+    if (e.shiftKey && document.activeElement === first){ last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last){ first.focus(); e.preventDefault(); }
+  };
+  el._trap = trap;
+  el.addEventListener('keydown', trap, { capture:true });
+
+  // move focus into the drawer
+  const focusable = el.querySelector('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+  (focusable || el).focus();
+}
+
 function closeDrawer(el){
+  if (!el) return;
   el.classList.remove('open');
   el.setAttribute('aria-hidden','true');
   markDrawerState();
   if (el._trap){ el.removeEventListener('keydown', el._trap, { capture:true }); el._trap = null; }
   if (_lastFocus && document.body.contains(_lastFocus)) _lastFocus.focus();
 }
-  document.addEventListener('keydown',(e)=>{
-    if(e.key==='Escape'){
-      const open=document.querySelector('.drawer.open');
-      if(open){ e.preventDefault(); closeDrawer(open); }
-    }
-  });
-  // Keep drawer a11y in sync with layout changes
+
+// Global listeners (attach once)
+document.addEventListener('keydown',(e)=>{
+  if (e.key === 'Escape'){
+    const open = document.querySelector('.drawer.open');
+    if (open){ e.preventDefault(); closeDrawer(open); }
+  }
+});
+
+// Keep drawer a11y in sync with layout changes
 window.addEventListener('resize', applyAllDrawerA11y);
 // === BEGIN ADD: End-of-game modal wiring ===
 const endModal = $('endModal'),
@@ -2856,22 +2887,17 @@ function suitPulse(suit){
     wireButtons();
 (function init(){
   loadPrefs();
-  // Respect reduced motion on first load
   if (!Pref.anims) document.body.classList.add('no-anim');
-
   adjustCardSize();
   updateModeTag();
   wireButtons();
 
-  applyAllDrawerA11y(); // <-- add this line
+  applyAllDrawerA11y();      // keep this once
 
-  // Load saved game or start fresh UI
-  if (loadState()){
-    render();
-  } else {
-    render(); // empty boards
-  }
-  // Auto-open tutorial …
+  if (loadState()) render(); // state/first render
+  else render();
+
+  const TUTO_KEY = 'arcana_tutorial_seen_v1';
   if (!localStorage.getItem(TUTO_KEY)) {
     setTimeout(()=> {
       openDrawer($('tutorialDrawer'));
