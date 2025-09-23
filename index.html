@@ -2878,24 +2878,15 @@ function suitPulse(suit){
 
   // === Boot ===
   (function init(){
-    loadPrefs();
-    // Respect reduced motion on first load
-    if (!Pref.anims) document.body.classList.add('no-anim');
-
-    adjustCardSize();
-    updateModeTag();
-    wireButtons();
-(function init(){
   loadPrefs();
   if (!Pref.anims) document.body.classList.add('no-anim');
   adjustCardSize();
   updateModeTag();
   wireButtons();
+  applyAllDrawerA11y();
 
-  applyAllDrawerA11y();      // keep this once
-
-  if (loadState()) render(); // state/first render
-  else render();
+  if (!loadState()) { /* no saved game */ }
+  render();
 
   const TUTO_KEY = 'arcana_tutorial_seen_v1';
   if (!localStorage.getItem(TUTO_KEY)) {
@@ -2923,14 +2914,14 @@ if (!localStorage.getItem(TUTO_KEY)) {
 function rankTip(c){
   const r = c.rank;
   if (isPage(c)) return 'Page (Joker): wild; costs 1 extra discard and −1 point when used in non-Page melds.';
-  if (r==='A') return 'Ace: try to block 7/9 (d6: 4–6 blocks +1); discard 2 to auto-block a Sigil.';
-  if (r==='6') return 'Action 6: Draw 2.';
-  if (r==='7') return 'Action 7: Steal 1 random card (Ace can try to block).';
-  if (r==='9') return 'Action 9: Swap — give 1, take 1 (Ace can try to block).';
-  if (r==='J') return 'Sigil J: +1 point or draw 1 (can be auto-blocked by 2 Aces).';
-  if (r==='Q') return 'Sigil Q: +2 points or draw 1 (can be auto-blocked by 2 Aces).';
-  if (r==='K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
-  return 'Normal: make Sets, Runs, or Pairs. Same-suit Runs can trigger suit bonuses.';
+  if (r === 'A') return 'Ace: try to block 7/9 (d6: 4–6 blocks +1); discard 2 to auto-block a Sigil.';
+  if (r === '6') return 'Action 6: Draw 2.';
+  if (r === '7') return 'Action 7: Steal 1 random card (Ace can try to block).';
+  if (r === '9') return 'Action 9: Swap — give 1, take 1 (Ace can try to block).';
+  if (r === 'J') return 'Sigil J: +1 point or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r === 'Q') return 'Sigil Q: +2 points or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r === 'K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
+  return `Rank ${r}${c.suit ? ' of ' + suitSlug(c.suit) : ''}`;
 }
       // === Unified userAction dispatcher ===
   function userAction(act){
