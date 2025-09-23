@@ -978,17 +978,18 @@ function showEndModal(winnerPid){
         // reset backoff on success
         this._retryDelay=800;
 
-        if(Pref.role==='host'){
-          this.hostId=Pref.room || ('room-'+Math.random().toString(36).slice(2,8));
-          send({type:'host',hostId:this.hostId});
-          toastSafe(`Room: ${this.hostId}`); log(`Hosting room: ${this.hostId}`);
-        }else{ showRoomUI(Net.hostId);
-          this.hostId=Pref.room;
-          if(!this.hostId){ log('Enter a Room/Host ID, then Connect.'); return; }
-          send({type:'join',hostId:this.hostId});
-          toastSafe(`Joining: ${this.hostId}`); log(`Joining room: ${this.hostId}`);
-              if (Pref.role !== 'host') hideRoomUI();
-        }
+        if (Pref.role==='host'){
+  this.hostId = Pref.room || ('room-'+Math.random().toString(36).slice(2,8));
+  send({type:'host', hostId:this.hostId});
+  toastSafe(`Room: ${this.hostId}`); log(`Hosting room: ${this.hostId}`);
+} else {
+  this.hostId = Pref.room;
+  if (!this.hostId){ log('Enter a Room/Host ID, then Connect.'); return; }
+  send({type:'join', hostId:this.hostId});
+  toastSafe(`Joining: ${this.hostId}`); log(`Joining room: ${this.hostId}`);
+  showRoomUI(this.hostId);             // ← moved here
+  if (Pref.role !== 'host') hideRoomUI();
+}
         updateModeTag(); updateStartDisabled();
         Net.startHeartbeat();
       };
