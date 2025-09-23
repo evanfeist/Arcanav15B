@@ -2856,9 +2856,14 @@ function suitPulse(suit){
     } else {
       render(); // empty boards
     }
-// Auto-open tutorial the first time
+// Auto-open tutorial the first time (reset to step 1 + dot #1)
 if (!localStorage.getItem(TUTO_KEY)) {
-  setTimeout(()=> openDrawer($('tutorialDrawer')), 400);
+  setTimeout(()=>{
+    const steps = $('tutorialDrawer').querySelectorAll('.step');
+    steps.forEach((s,i)=> s.classList.toggle('active', i===0));
+    updateTutorialDots(0);
+    openDrawer($('tutorialDrawer'));
+  }, 400);
 }  })();
 
 function rankTip(c){
