@@ -2768,10 +2768,22 @@ function suitPulse(suit){
   }
 
   function wireButtons(){
-const tbtn = $('btnTutorial');
-if (tbtn) tbtn.onclick = ()=> openDrawer($('tutorialDrawer'));
-    const mbT = $('mbTutorial');
-if (mbT) mbT.onclick = ()=> openDrawer($('tutorialDrawer'));
+  const tbtn = $('btnTutorial');
+  if (tbtn) tbtn.onclick = ()=>{
+    // reset tutorial to first step and dot
+    const steps = $('tutorialDrawer').querySelectorAll('.step');
+    steps.forEach((s,i)=> s.classList.toggle('active', i===0));
+    updateTutorialDots(0);
+    openDrawer($('tutorialDrawer'));
+  };
+
+  const mbT = $('mbTutorial');
+  if (mbT) mbT.onclick = ()=>{
+    const steps = $('tutorialDrawer').querySelectorAll('.step');
+    steps.forEach((s,i)=> s.classList.toggle('active', i===0));
+    updateTutorialDots(0);
+    openDrawer($('tutorialDrawer'));
+  };
     // Desktop
     $('btnStart').onclick = ()=> userAction({type:'START', pid:myPid()});
     $('btnRules').onclick = ()=> openDrawer($('rulesDrawer'));
