@@ -757,7 +757,18 @@ function suitSlug(s){
     if (isPage(c)) return IMG_BASE + `page ${c.pageIndex}` + EXT;
 return IMG_BASE + `${rankSlug(c.rank)} ${suitSlug(c.suit)}` + EXT;
   }
-
+function rankTip(c){
+  const r = c.rank;
+  if (isPage(c)) return 'Page (Joker): wild; costs 1 extra discard and −1 point when used in non-Page melds.';
+  if (r === 'A') return 'Ace: try to block 7/9 (d6: 4–6 blocks +1); discard 2 to auto-block a Sigil.';
+  if (r === '6') return 'Action 6: Draw 2.';
+  if (r === '7') return 'Action 7: Steal 1 random card (Ace can try to block).';
+  if (r === '9') return 'Action 9: Swap — give 1, take 1 (Ace can try to block).';
+  if (r === 'J') return 'Sigil J: +1 point or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r === 'Q') return 'Sigil Q: +2 points or draw 1 (can be auto-blocked by 2 Aces).';
+  if (r === 'K') return 'Sigil K: +3 points or draw 2 (can be auto-blocked by 2 Aces).';
+  return `${r}${c.suit ? ' of ' + suitSlug(c.suit) : ''}`;
+}
   // Prefs & save
   const PREF_KEY='arcana_prefs_v2';
   const SAVE_KEY='arcana_state_v1';
@@ -2896,20 +2907,6 @@ function suitPulse(suit){
     }, 400);
   }
 })();
-    // Load saved game or start fresh UI
-    if (loadState()){
-      render();
-    } else {
-      render(); // empty boards
-    }
-// Auto-open tutorial the first time (but do NOT toggle tutorial mode globally)
-if (!localStorage.getItem(TUTO_KEY)) {
-  setTimeout(()=> {
-    openDrawer($('tutorialDrawer'));
-    // mark as shown so it won’t auto-open again
-    localStorage.setItem(TUTO_KEY, '1');
-  }, 400);
-}  })();
 
 function rankTip(c){
   const r = c.rank;
