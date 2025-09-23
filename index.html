@@ -617,14 +617,20 @@
     </div>
 
     <div class="panel" style="display:flex;justify-content:space-between;gap:8px;margin-top:10px">
-      <label style="display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="tutorialDontShow"> Don’t show again
-      </label>
-      <div style="display:flex;gap:8px">
-     <button type="button" id="tutorialPrev">Back</button>
-       <button type="button" id="tutorialNext" class="btn-ok">Next</button>
-      </div>
-    </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <label style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="tutorialDontShow"> Don’t show again
+    </label>
+    <label style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="optCoachAfter">
+      Start guided tips after this
+    </label>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button type="button" id="tutorialPrev">Back</button>
+    <button type="button" id="tutorialNext" class="btn-ok">Next</button>
+  </div>
+</div>
   </div>
 </div>
 
@@ -834,13 +840,19 @@ const Coach = {
   start(){ this.on=true; this.step=0; this.el.setAttribute('aria-hidden','false'); this.show(); },
   stop(){ this.on=false; this.el.innerHTML=''; this.el.setAttribute('aria-hidden','true'); }
 };
-// Auto-start coach mode when the last “Tutorial” pane closes
+// Coach start should be opt-in only
 (function wireCoachFromTutorial(){
   const oldNext = $('tutorialNext').onclick;
   $('tutorialNext').onclick = ()=>{
     if (typeof oldNext === 'function') oldNext();
+
+    // When the tutorial drawer closes, check opt-in
     const isOpen = $('tutorialDrawer').classList.contains('open');
-    if (!isOpen) Coach.start();
+    if (!isOpen) {
+      const wantCoach = !!($('optCoachAfter') && $('optCoachAfter').checked);
+      if (wantCoach) Coach.start();
+      else Coach.stop();
+    }
   };
 })();
 // === END ADD: Coach (guided tutorial callouts) ===
