@@ -1196,7 +1196,6 @@ function decayBeliefSlightly(){
   }
   function endOfTurnDraw(pid){ draw(pid,1) }
 function ensureMyTurnUI(){
-  function render(){
   const myTurn = G.started && (G.turn === myPid());
   const ids = ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'];
   ids.forEach(id => {
