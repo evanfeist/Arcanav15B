@@ -232,7 +232,7 @@
 }
 #tutorialDots .dot.on{ background:#6cc4ff; }
     .coach {
-  position:absolute; z-index:120; /* pointer-events:none;  <-- remove this */
+  position:absolute; z-index:120;
   background:rgba(15,24,38,.95); border:1px solid var(--border);
   padding:10px 12px; border-radius:12px; max-width:240px; box-shadow:var(--shadow)
 }
@@ -2930,20 +2930,6 @@ if (copyBtn) {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
   }
-</script>
-  <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  });
-}
-</script>
-  <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  });
-}
 </script>
 </body>
 </html>
