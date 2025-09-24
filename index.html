@@ -1234,6 +1234,8 @@ function ensureMyTurnUI(){
     el.setAttribute('aria-disabled', String(!myTurn));
   });
 }
+
+function render(){
   const myTurn = G.started && (G.turn === myPid());
 
   // Header / KPIs
