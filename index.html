@@ -149,12 +149,12 @@
     }
     .tabbar .tray{
   display:grid;
-  grid-template-columns: repeat(4, 1fr); /* phones: wrap to 2 rows */
+  grid-template-columns: repeat(4, 1fr);
   gap:10px;
 }
 @media (min-width: 420px){
   .tabbar .tray{
-    grid-template-columns: repeat(7, 1fr); /* wider screens: single row */
+    grid-template-columns: repeat(4, 1fr);
   }
 }
     .tabbar button{padding:12px 8px;border-radius:12px}
@@ -1219,6 +1219,7 @@ function decayBeliefSlightly(){
   }
   function endOfTurnDraw(pid){ draw(pid,1) }
 function ensureMyTurnUI(){
+  function render(){
   const myTurn = G.started && (G.turn === myPid());
   const ids = ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'];
   ids.forEach(id => {
@@ -1289,8 +1290,8 @@ if (!myTurn && G.selected.size) G.selected.clear(); // prevent ghost selections 
     $('yourHand').querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
 paintHints();
 ensureMyTurnUI();
-updateStartDisabled();}
-  }
+updateStartDisabled();
+}
   function updateStartDisabled(){
     const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
     ['btnStart','mbStart'].forEach(id=>{ const el=$(id); if(el){ el.disabled=shouldDisableStart; el.setAttribute('aria-disabled', String(shouldDisableStart)) }})
