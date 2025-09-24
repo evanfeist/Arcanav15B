@@ -41,25 +41,46 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  const url = new URL(req.url);
+
   // Ignore non-http(s) schemes (e.g., chrome-extension:// on desktop browsers)
-const url = new URL(req.url);
-if (!(url.protocol === 'http:' || url.protocol === 'https:')) {
-  return; // let the browser handle it
-}
-  if (!isHttpGet(req)) return; // ignore non-http(s) or non-GET
+  if (!(url.protocol === 'http:' || url.protocol === 'https:')) return;
+
+  // Handle page navigations (offline fallback to index.html)
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const net = await fetch(req);
+          if (net && net.status === 200) {
+            caches.open(CACHE_NAME).then(c => c.put(req, net.clone())).catch(()=>{});
+          }
+          return net;
+        } catch {
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match('./index.html');
+          return cached || Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
+  // Only cache GET requests
+  if (req.method !== 'GET') return;
 
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
-      // network-first, then put a clone into cache (best-effort)
+
       return fetch(req).then((res) => {
-        // only cache basic/opaque ok responses
-        const ok = res && (res.status === 200 || res.type === 'opaque');
-        if (ok) {
+        const ok = res && res.status === 200;
+        const sameOrigin = url.origin === self.location.origin;
+        if (ok && sameOrigin) {
           caches.open(CACHE_NAME).then(cache => cache.put(req, res.clone())).catch(()=>{});
         }
         return res;
-      }).catch(() => cached); // fallback to cache if fetch fails
+      }).catch(() => cached);
     })
   );
 });
