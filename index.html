@@ -2945,13 +2945,13 @@ if (copyBtn) {
   if (!loadState()) { /* no saved game */ }
   render();
 
-    if (!localStorage.getItem(TUTO_KEY)) {
+const TUTO_KEY = 'arcana_tutorial_seen_v1';
+if (!localStorage.getItem(TUTO_KEY)) {
   setTimeout(()=> {
     openDrawer($('tutorialDrawer'));
     localStorage.setItem(TUTO_KEY, '1');
   }, 400);
 }
-  }
 })();
     
       // === Unified userAction dispatcher ===
