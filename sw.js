@@ -1,44 +1,58 @@
-const CACHE = 'arcana-v1';
+// sw.js  (plain text UTF-8)
+const CACHE_NAME = 'arcana-v3';
 const ASSETS = [
-  './',                // important: relative, not "/"
-  'index.html',
-  'manifest.webmanifest',
-  'cards/back.webp'
-  // add any always-needed faces here if you like
+  './',
+  './index.html',
+  './cards/back.webp',
+  './cards/back.png',
+  './manifest.webmanifest'
 ];
 
-self.addEventListener('install', (e) => {
-  self.skipWaiting(); // optional: activate new SW immediately on next nav
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.all(
+        ASSETS.map(url => cache.add(url).catch(()=>void 0))
+      )
+    )
+  );
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const { request } = e;
-  if (request.method !== 'GET') return;
+// Only handle http/https GET (skip chrome-extension:, data:, etc.)
+function isHttpGet(request){
+  if (request.method !== 'GET') return false;
+  try{
+    const u = new URL(request.url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  }catch{
+    return false;
+  }
+}
 
-  e.respondWith(
-    caches.match(request).then(hit =>
-      hit || fetch(request).then(resp => {
-        // opportunistic cache for game shell & card images
-        if (
-          request.url.includes('/cards/') ||
-          request.destination === 'document' ||
-          request.destination === 'script' ||
-          request.destination === 'style'
-        ) {
-          const copy = resp.clone();
-          caches.open(CACHE).then(c => c.put(request, copy));
-        }
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (!isHttpGet(req)) return; // <-- prevents the chrome-extension error
+
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+
+      return fetch(req).then((resp) => {
+        const copy = resp.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(req, copy).catch(()=>{}); // guard put() for opaque responses
+        });
         return resp;
-      }).catch(() => caches.match('index.html')) // offline fallback
-    )
+      }).catch(() => caches.match('./index.html'));
+    })
   );
 });
