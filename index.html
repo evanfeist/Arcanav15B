@@ -870,9 +870,15 @@ const Coach = {
       else { this.stop(); toastSafe('Tutorial complete!'); }
     };
   },
-  start(){ this.on=true; this.step=0; this.el.setAttribute('aria-hidden','false'); this.show(); },
-  stop(){ this.on=false; this.el.innerHTML=''; this.el.setAttribute('aria-hidden','true'); }
-};
+  start(){ this.on=true; this.step=0; this.el.setAttribute('aria-hidden','false'); this.show(); paintHints();
+         },
+  stop(){
+  this.on = false;
+  const host = $('yourHand');
+  if (host) host.querySelectorAll('.card.hint').forEach(n =>
+    n.classList.remove('hint','bad')
+  );
+},
 
 // === END ADD: Coach (guided tutorial callouts) ===
   // Anim helpers
@@ -1689,6 +1695,14 @@ function computeHints(pid, selectedIds){
   return { good, bad };
 }
 function paintHints(){
+  // Only show dotted hint outlines when guided tips (Coach) is ON
+if (!Coach.on){
+  const host = $('yourHand');
+  if (host) host.querySelectorAll('.card.hint').forEach(n =>
+    n.classList.remove('hint','bad')
+  );
+  return;
+}
   const pid = myPid();
   const host = $('yourHand');
   host.querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
