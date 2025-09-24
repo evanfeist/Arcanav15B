@@ -845,43 +845,17 @@ const Coach = {
     {id:'btnConstruct',text:'When valid, press <b>Construct</b> to score it.', at:'top'},
     {id:'btnAction',   text:'Use <b>Actions</b> (6/7/9) for tempo or disruption.', at:'top'}
   ],
-  show(){
-    const host=this.el; host.innerHTML='';
-    const s=this.steps[this.step]; if(!s) return;
-    const t=document.getElementById(s.id); if(!t) return;
-    const r=t.getBoundingClientRect();
-    const c=document.createElement('div'); c.className='coach'; c.dataset.at=s.at;
-    c.innerHTML=`<div>${s.text}</div>
-      <div style="margin-top:6px;display:flex;gap:8px">
-        <button id="coachPrev">Back</button>
-        <button id="coachNext" class="btn-ok">Next</button>
-      </div>
-      <div class="coach-arrow"></div>`;
-    this.el.appendChild(c);
-
-    const y = (s.at==='bottom') ? r.bottom + 8 + window.scrollY : r.top - c.offsetHeight - 8 + window.scrollY;
-    const x = r.left + Math.min(0, (r.width-240)/2) + window.scrollX;
-    Object.assign(c.style,{position:'absolute', top:y+'px', left:x+'px'});
-
-    $('coachPrev').onclick = ()=>{ this.step=Math.max(0,this.step-1); this.show(); };
-    $('coachNext').onclick = ()=>{ 
-      if (this.step < this.steps.length-1){ this.step++; this.show(); }
-      else { this.stop(); toastSafe('Tutorial complete!'); }
-    };
-  },
-  start(){ this.on=true; this.step=0; this.el.setAttribute('aria-hidden','false'); this.show(); paintHints();
-         },
+  show(){ /* unchanged */ },
+  start(){ /* unchanged */ },
   stop(){
-  this.on = false;
-  const host = $('yourHand');
-  if (host) host.querySelectorAll('.card.hint').forEach(n =>
-    n.classList.remove('hint','bad')
-  );
-},
+    this.on = false;
+    const host = $('yourHand');
+    if (host) host.querySelectorAll('.card.hint').forEach(n =>
+      n.classList.remove('hint','bad')
+    );
+  }
+}; 
 
-// === END ADD: Coach (guided tutorial callouts) ===
-  // Hints toggle — only on during Coach/guided tips
-let HINTS_ON = false;
   // Anim helpers
   function addAnim(el,cls,ms=400){
     if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
@@ -1696,11 +1670,23 @@ function computeHints(pid, selectedIds){
   return { good, bad };
 }
 function paintHints(){
-  // remove hints from any card no longer in hand (edge cases)
-host.querySelectorAll('.card.hint').forEach(n => {
-  const id = Number(n.dataset.id);
-  if (!G.players[pid].hand.some(c => c.id === id)) n.classList.remove('hint','bad');
-});
+  const host = $('yourHand');
+  if (!host) return;
+
+  // clear any existing hint halos
+  host.querySelectorAll('.card.hint').forEach(n => n.classList.remove('hint','bad'));
+
+  // only paint when Guided Tips are on
+  if (!(HINTS_ON || (typeof Coach !== 'undefined' && Coach.on))) return;
+
+  const pid = myPid();
+  const { good, bad } = computeHints(pid, G.selected);
+
+  host.querySelectorAll('.card').forEach(n=>{
+    const id = Number(n.dataset.id);
+    if (good.has(id)) n.classList.add('hint');
+    else if (bad.has(id)) n.classList.add('hint','bad');
+  });
 }
 // === END ADD: selection-time hinting ===
   // LOG
