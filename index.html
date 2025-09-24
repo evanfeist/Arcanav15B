@@ -150,8 +150,9 @@
     }
     .tabbar .tray{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns: repeat(4, 1fr); /* 4 per row on phones */
   gap:10px;
+  grid-auto-rows: minmax(44px, auto); /* gives second line a nice height */
 }
 @media (min-width:500px){
   .tabbar .tray{grid-template-columns:repeat(6,1fr)}
@@ -341,29 +342,7 @@
   outline-color: var(--bad);
   box-shadow:0 0 0 2px rgba(255,107,122,.25)
 }
-    /* === Interaction fixes: overlays === */
-/* Make overlay hosts non-blocking */
-#coachHost{
-  position: fixed;
-  inset: 0;
-  pointer-events: none;   /* host ignores clicks */
-}
-.coach{
-  pointer-events: auto;   /* only the bubble itself can be clicked */
-}
-
-/* Suit/bonus banner host should not block taps either */
-#bannerHost{
-  pointer-events: none;
-}
-
-/* Drawers only catch clicks when open */
-.drawer{ pointer-events: none; }
-.drawer.open{ pointer-events: auto; }
-    
-  </style>
-</head>
-<body>
+`
   <a class="sr-only" href="#main">Skip to content</a>
 
   <div class="wrap" id="main">
@@ -1222,6 +1201,7 @@ function decayBeliefSlightly(){
     }
   }
   function endOfTurnDraw(pid){ draw(pid,1) }
+
 function ensureMyTurnUI(){
   const myTurn = G.started && (G.turn === myPid());
   const ids = ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'];
@@ -1231,9 +1211,6 @@ function ensureMyTurnUI(){
     el.setAttribute('aria-disabled', String(!myTurn));
   });
 }
-
-function render(){
-  const myTurn = G.started && (G.turn === myPid());
 
   // Header / KPIs
   $('deckTag').textContent    = G.deck.length;
