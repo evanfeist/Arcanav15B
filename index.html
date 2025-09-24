@@ -2945,10 +2945,12 @@ if (copyBtn) {
   if (!loadState()) { /* no saved game */ }
   render();
 
-    setTimeout(()=> {
-      openDrawer($('tutorialDrawer'));
-      localStorage.setItem(TUTO_KEY, '1');
-    }, 400);
+    if (!localStorage.getItem(TUTO_KEY)) {
+  setTimeout(()=> {
+    openDrawer($('tutorialDrawer'));
+    localStorage.setItem(TUTO_KEY, '1');
+  }, 400);
+}
   }
 })();
     
