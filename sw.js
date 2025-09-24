@@ -41,6 +41,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  // Ignore non-http(s) schemes (e.g., chrome-extension:// on desktop browsers)
+const url = new URL(req.url);
+if (!(url.protocol === 'http:' || url.protocol === 'https:')) {
+  return; // let the browser handle it
+}
   if (!isHttpGet(req)) return; // ignore non-http(s) or non-GET
 
   event.respondWith(
