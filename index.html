@@ -881,6 +881,8 @@ const Coach = {
 },
 
 // === END ADD: Coach (guided tutorial callouts) ===
+  // Hints toggle — only on during Coach/guided tips
+let HINTS_ON = false;
   // Anim helpers
   function addAnim(el,cls,ms=400){
     if(!el || !Pref.anims || document.body.classList.contains('no-anim')) return;
@@ -1695,17 +1697,14 @@ function computeHints(pid, selectedIds){
   return { good, bad };
 }
 function paintHints(){
-  // Only show dotted hint outlines when guided tips (Coach) is ON
-if (!Coach.on){
-  const host = $('yourHand');
-  if (host) host.querySelectorAll('.card.hint').forEach(n =>
-    n.classList.remove('hint','bad')
-  );
-  return;
-}
   const pid = myPid();
   const host = $('yourHand');
-  host.querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
+
+  // If hints are off, remove any existing halos and exit.
+  if (!HINTS_ON) {
+    if (host) host.querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
+    return;
+  }
 
   const {good, bad} = computeHints(pid, G.selected);
 
@@ -2725,8 +2724,9 @@ $('tutorialNext').onclick = ()=>{
 
     // Only start Coach if the user opted in
     const wantCoach = !!($('optCoachAfter') && $('optCoachAfter').checked);
-    if (wantCoach) Coach.start();
-    else Coach.stop();
+    if (wantCoach) Coach.start(); HINTS_ON = true; // enable selection hints while coach is on
+    else Coach.stop(); HINTS_ON = false; // disable hints when coach ends
+paintHints();     // repaint to clear any halos
   }
 };
 
