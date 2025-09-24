@@ -750,6 +750,7 @@
   const isPage=c=>c.page===true;
   const isJQK=r=>r==='J'||r==='Q'||r==='K';
   const rnd=n=>Math.floor(Math.random()*n);
+  let HINTS_ON = false;
 
   const IMG_BASE="cards/";
   const EXT=".webp";
@@ -1695,27 +1696,6 @@ function computeHints(pid, selectedIds){
   return { good, bad };
 }
 function paintHints(){
-  const pid = myPid();
-  const host = $('yourHand');
-
-  // If hints are off, remove any existing halos and exit.
-  if (!HINTS_ON) {
-    if (host) host.querySelectorAll('.card.hint').forEach(n=> n.classList.remove('hint','bad'));
-    return;
-  }
-
-  const {good, bad} = computeHints(pid, G.selected);
-
-  good.forEach(id=>{
-    const n = host.querySelector(`.card[data-id="${id}"]`);
-    if (n) n.classList.add('hint');
-  });
-  if (G.selected.size >= 2){
-    bad.forEach(id=>{
-      const n = host.querySelector(`.card[data-id="${id}"]`);
-      if (n) n.classList.add('hint','bad');
-    });
-  }
   // remove hints from any card no longer in hand (edge cases)
 host.querySelectorAll('.card.hint').forEach(n => {
   const id = Number(n.dataset.id);
@@ -2710,27 +2690,26 @@ function updateTutorialDots(i){
 }
 
 $('tutorialNext').onclick = ()=>{
-  const steps = $$('#tutorialDrawer .step');
-  let i = steps.findIndex(s=> s.classList.contains('active'));
-  steps[i].classList.remove('active');
-
+  const steps = Array.from($('tutorialDrawer').querySelectorAll('.step'));
+  let i = steps.findIndex(s => s.classList.contains('active'));
   if (i < steps.length - 1) {
-    steps[i+1].classList.add('active');
+    steps[i].classList.remove('active');
+    steps[i + 1].classList.add('active');
     updateTutorialDots(i + 1);
   } else {
     if ($('tutorialDontShow').checked) localStorage.setItem(TUTO_KEY, '1');
     closeDrawer($('tutorialDrawer'));
 
-    // === Guided Tips opt-in ===
+    // Guided tips opt-in controls hints
     const wantCoach = !!($('optCoachAfter') && $('optCoachAfter').checked);
     if (wantCoach) {
-      HINTS_ON = true;
       Coach.start();
+      HINTS_ON = true;
     } else {
       Coach.stop();
       HINTS_ON = false;
     }
-    paintHints();
+    paintHints(); // repaint to add/remove halos immediately
   }
 };
 
