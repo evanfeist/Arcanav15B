@@ -47,7 +47,7 @@
   <meta name="twitter:title" content="Arcana: Fortune Favors the Clever">
   <meta name="twitter:description" content="Every suit has power, every play has risk — can you reach 60 first?">
 
-<link rel="preload" as="image" href="cards/back.webp">
+<link rel="preload" href="cards/back.webp" as="image" type="image/webp">
   
   <style>
     :root{
@@ -1226,6 +1226,7 @@ function ensureMyTurnUI(){
   });
 }
 function render(){
+  const myTurn = G.started && (G.turn === myPid());
   
   // Header / KPIs
   $('deckTag').textContent    = G.deck.length;
@@ -1302,7 +1303,6 @@ function render(){
   updateStartDisabled();
   updateConstructPreview();
 }
-  }
   function updateStartDisabled(){
     const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
     ['btnStart','mbStart'].forEach(id=>{ const el=$(id); if(el){ el.disabled=shouldDisableStart; el.setAttribute('aria-disabled', String(shouldDisableStart)) }})
