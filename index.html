@@ -162,7 +162,9 @@
 }
     .tabbar button{padding:12px 8px;border-radius:12px}
     body.drawer-open .tabbar{transform:translateY(120%);opacity:0;pointer-events:none}
-
+@media (max-width: 380px){
+  .tabbar .tray{ grid-template-columns: repeat(3, 1fr); }
+}
     button{background:#162232;color:var(--ink);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer}
     button:disabled{opacity:.55;cursor:not-allowed}
     .btn-accent{border-color:#2b5aa1;background:#153055}
@@ -198,18 +200,6 @@
   70% { box-shadow: 0 0 0 10px rgba(108,196,255,0) }
   100% { box-shadow: 0 0 0 0 rgba(108,196,255,0) }
 }
-    /* === Overlay & Banner Pointer Events Fix === */
-#coachHost{
-  position: fixed;
-  inset: 0;
-  pointer-events: none;   /* host ignores clicks */
-}
-.coach{
-  pointer-events: auto;   /* bubble itself clickable */
-}
-#bannerHost{ pointer-events: none; }
-.drawer{ pointer-events: none; }
-.drawer.open{ pointer-events: auto; }
 #turnTag.my-turn{
   background:#0f1b2c;
   border-color:#2b5aa1;
@@ -1236,14 +1226,91 @@ function decayBeliefSlightly(){
   }
   function endOfTurnDraw(pid){ draw(pid,1) }
 function ensureMyTurnUI(){
-  function render(){
   const myTurn = G.started && (G.turn === myPid());
   const ids = ['btnAction','btnSigil','btnConstruct','btnDiscard','mbAction','mbSigil','mbConstruct','mbDiscard'];
   ids.forEach(id => {
-    const el = $(id); if(!el) return;
+    const el = $(id); if (!el) return;
     el.disabled = !myTurn;
     el.setAttribute('aria-disabled', String(!myTurn));
   });
+}
+    function render(){
+  const myTurn = G.started && (G.turn === myPid());
+
+  // Header / KPIs
+  $('deckTag').textContent    = G.deck.length;
+  $('discardTag').textContent = G.discard.length;
+  $('scoreYou').textContent   = G.players[myPid()].score;
+  $('scoreAI').textContent    = G.players[1 - myPid()].score;
+
+  $('turnTag').textContent = G.started
+    ? (myTurn ? 'Your turn'
+              : (Pref.mode === 'online' ? 'Their turn' : (G.turn===0 ? 'Your turn' : 'AI turn')))
+    : '—';
+  $('turnTag').classList.toggle('my-turn', myTurn);
+
+  if (G.started){
+    const live = $('srLive');
+    if (live){ live.textContent=''; setTimeout(()=> live.textContent = $('turnTag').textContent, 0); }
+  }
+  if (G.started && G.clubChain > 0 && G.turn === myPid()){
+    const n = Math.min(2, G.clubChain);
+    $('turnTag').textContent = $('turnTag').textContent + ` • extra turn (${n}/2)`;
+  }
+
+  $('modeTag').textContent = Pref.mode==='online'
+    ? (Pref.role.toUpperCase() + ' • ' + (Net.connected ? 'ONLINE' : 'OFFLINE'))
+    : ('SOLO • ' + Pref.ai.toUpperCase());
+
+  // Hands
+  const yh = $('yourHand'), ah = $('aiHand');
+  yh.innerHTML = ''; ah.innerHTML = '';
+
+  // Your hand (fronts)
+  G.players[myPid()].hand.forEach((c)=>{
+    const n = cardNode(c,true);
+    n.tabIndex = 0;
+    n.onkeydown = (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleSelect(c.id,n) } };
+    if (G.selected.has(c.id)) n.classList.add('selected');
+
+    let pressTimer=null, wasLong=false, startX=null;
+    n.onpointerdown = (e)=>{ wasLong=false; startX=e.clientX; pressTimer=setTimeout(()=>{wasLong=true; toggleSelect(c.id,n); buzz(12); addAnim(n,'anim-pop',180)},220) };
+    n.onpointerup = (e)=>{ clearTimeout(pressTimer);
+      const swiped=(Pref.swipe && startX!=null && Math.abs(e.clientX-startX)>90);
+      if(swiped && G.turn===myPid()){ G.selected.clear(); G.selected.add(c.id); userAction({type:'DISCARD',pid:myPid(),cardId:c.id}) }
+      else if(!wasLong){ toggleSelect(c.id,n); buzz(8); addAnim(n,'anim-pop',180) }
+      startX=null;
+    };
+    n.onpointercancel=n.onpointerleave=()=>{ clearTimeout(pressTimer); startX=null };
+    yh.appendChild(n);
+  });
+  $('youCount').textContent = G.players[myPid()].hand.length;
+
+  // Dim your hand if it’s not your turn
+  if (myTurn) yh.classList.remove('dim'); else yh.classList.add('dim');
+
+  // Opponent hand (backs)
+  G.players[1 - myPid()].hand.forEach(_=>{
+    const d = cardNode({back:true}, false);
+    ah.appendChild(d);
+  });
+  $('aiCount').textContent = G.players[1 - myPid()].hand.length;
+
+  // Deal-in animations on count increase
+  const cur0 = G.players[0].hand.length, cur1 = G.players[1].hand.length;
+  if(cur0 > Prev.handCounts[0] && myPid()===0){ const last=yh.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+  if(cur1 > Prev.handCounts[1] && myPid()===1){ const last=yh.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+  if(cur0 > Prev.handCounts[0] && myPid()===1){ const last=ah.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+  if(cur1 > Prev.handCounts[1] && myPid()===0){ const last=ah.lastElementChild; if(last) addAnim(last,'anim-deal',280) }
+  Prev.handCounts = [cur0, cur1];
+
+  // Selection/hints & controls
+  if (!myTurn && G.selected.size) G.selected.clear();
+  $('yourHand').querySelectorAll('.card.hint').forEach(n=>n.classList.remove('hint','bad'));
+  paintHints();
+  ensureMyTurnUI();
+  updateStartDisabled();
+  updateConstructPreview();
 }
   const myTurn = G.started && (G.turn === myPid());
 $('deckTag').textContent=G.deck.length; $('discardTag').textContent=G.discard.length;
