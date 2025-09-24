@@ -342,7 +342,21 @@
   outline-color: var(--bad);
   box-shadow:0 0 0 2px rgba(255,107,122,.25)
 }
-`
+    /* === Overlay & Banner Pointer Events Fix === */
+#coachHost{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* host ignores clicks */
+}
+.coach{
+  pointer-events: auto;   /* bubble itself clickable */
+}
+#bannerHost{ pointer-events: none; }
+.drawer{ pointer-events: none; }
+.drawer.open{ pointer-events: auto; }
+    
+    </style>
+  
   <a class="sr-only" href="#main">Skip to content</a>
 
   <div class="wrap" id="main">
@@ -1211,7 +1225,8 @@ function ensureMyTurnUI(){
     el.setAttribute('aria-disabled', String(!myTurn));
   });
 }
-
+function render(){
+  
   // Header / KPIs
   $('deckTag').textContent    = G.deck.length;
   $('discardTag').textContent = G.discard.length;
@@ -1287,6 +1302,7 @@ function ensureMyTurnUI(){
   updateStartDisabled();
   updateConstructPreview();
 }
+  }
   function updateStartDisabled(){
     const shouldDisableStart=(Pref.mode==='online' && Pref.role!=='host');
     ['btnStart','mbStart'].forEach(id=>{ const el=$(id); if(el){ el.disabled=shouldDisableStart; el.setAttribute('aria-disabled', String(shouldDisableStart)) }})
