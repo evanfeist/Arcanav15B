@@ -155,11 +155,7 @@
 @media (min-width:500px){
   .tabbar .tray{grid-template-columns:repeat(6,1fr)}
 }
-@media (min-width: 420px){
-  .tabbar .tray{
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
+
     .tabbar button{padding:12px 8px;border-radius:12px}
     body.drawer-open .tabbar{transform:translateY(120%);opacity:0;pointer-events:none}
 @media (max-width: 380px){
@@ -2949,8 +2945,6 @@ if (copyBtn) {
   if (!loadState()) { /* no saved game */ }
   render();
 
-  const TUTO_KEY = 'arcana_tutorial_seen_v1';
-  if (!localStorage.getItem(TUTO_KEY)) {
     setTimeout(()=> {
       openDrawer($('tutorialDrawer'));
       localStorage.setItem(TUTO_KEY, '1');
