@@ -2769,12 +2769,15 @@ return endTurn();
     if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
 
     log(`Ace block (d6=${roll}) → BLOCKED +1.`);
-    toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
-    actionBanner('🛡️ Ace Blocked', '+1 point');
-    notePlayerAceBlockSuccess();
-    believeSawOneAce();
+toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
+actionBanner('🛡️ Ace Blocked', '+1 point');
+notePlayerAceBlockSuccess();
+believeSawOneAce();
 
-    closeAceDrawer(); G.aceQuery = null; return endTurn();
+closeAceDrawer();
+G.aceQuery = null;
+G.acePick = null;   // clear selection on success, to match your other branches
+return endTurn();
   }
 };
 
