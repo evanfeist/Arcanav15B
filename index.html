@@ -2535,8 +2535,6 @@ if (kind === 'A9' && info && info.give) G.discard.push(info.give);
 log(`Ace block (d6=${roll}) → BLOCKED +1.`);
 toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
 actionBanner('🛡️ Ace Blocked', '+1 point');
-notePlayerAceBlockSuccess();
-believeSawOneAce();
 
 closeAceDrawer();
 G.aceQuery = null;
