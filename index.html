@@ -474,18 +474,25 @@
   </div>
 
   <div class="drawer" id="aceDrawer" aria-label="Ace reaction" aria-hidden="true">
-    <header class="bar"><h3 style="margin:0">React with Ace?</h3></header>
-    <div class="body">
-      <p id="acePrompt" style="margin-top:0;color:var(--sub)"></p>
-      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
-       <button type="button" id="aceYes" class="btn-ok">🛡️ Block (roll d6)</button>
-     <button type="button" id="aceNo" class="btn-warn">Let it resolve</button>
-      </div>
-      <p style="margin:.5rem 0 0 0;font-size:12px;color:var(--sub)">
-        On 7/9: 1–3 fail (action proceeds), 4–6 block + counter +1. On Sigil: discard 2 Aces to auto-block.
-      </p>
+  <header class="bar"><h3 style="margin:0">React with Ace?</h3></header>
+  <div class="body">
+    <p id="acePrompt" style="margin-top:0;color:var(--sub)"></p>
+
+    <!-- NEW: Ace picker row (shown only when you have more Aces than needed) -->
+    <div id="acePickRow" style="display:none;margin:6px 0 10px">
+      <div id="aceChoices" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <p id="acePickHelp" class="sub" style="margin:.5rem 0 0 0;font-size:12px;color:var(--sub)"></p>
     </div>
+
+    <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+      <button type="button" id="aceYes" class="btn-ok">🛡️ Block (roll d6)</button>
+      <button type="button" id="aceNo" class="btn-warn">Let it resolve</button>
+    </div>
+    <p style="margin:.5rem 0 0 0;font-size:12px;color:var(--sub)">
+      On 7/9: 1–3 fail (action proceeds), 4–6 block + counter +1. On Sigil: discard 2 Aces to auto-block.
+    </p>
   </div>
+</div>
 
   <div class="drawer" id="sigilDrawer" aria-label="Play a Sigil" aria-hidden="true">
     <header class="bar"><h3 style="margin:0">Play Sigil</h3></header>
@@ -2020,7 +2027,37 @@ if (pid===0){ Telemetry.player.discards++; markPlayerTurn('discard'); }
 }
     }
   }
+// --- Ace selection helpers ---
+// Store the user’s current selection when the Ace drawer is open
+G.acePick = null; // array of card ids (length 1 for 7/9, 2 for Sigil) or null
 
+function myAces(){
+  return G.players[myPid()].hand.filter(c => c.rank === 'A');
+}
+
+// Spend exactly the chosen Aces by id; fall back to first match if id not found.
+function spendChosenAces(pid, chosenIds){
+  if (!chosenIds || !chosenIds.length) return false;
+  const h = G.players[pid].hand;
+  let used = 0;
+
+  // try id match first, then suit fallback to avoid double-spend
+  for (const id of chosenIds){
+    let i = h.findIndex(c => c.rank==='A' && (c.id===id || c._id===id));
+    if (i < 0) {
+      // fallback: any Ace of a suit not already spent
+      i = h.findIndex(c => c.rank==='A' && !chosenIds.slice(0,used).some(xid=>{
+        const spent = h.find(cc => cc.rank==='A' && (cc.id===xid || cc._id===xid));
+        return spent && spent.suit === c.suit;
+      }));
+    }
+    if (i >= 0){
+      G.discard.push(h.splice(i,1)[0]);
+      used++;
+    }
+  }
+  return used === chosenIds.length;
+}
   function spendNAces(pid,n){
     const h=G.players[pid].hand; let used=0;
     for(let i=0;i<h.length&&used<n;){ if(h[i].rank==='A'){ G.discard.push(h.splice(i,1)[0]); used++ } else i++ }
@@ -2553,14 +2590,77 @@ return;
 
   const aceDrawer=$('aceDrawer'), aceYes=$('aceYes'), aceNo=$('aceNo');
   function openAceDrawer(){
-    const need = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
-    $('aceYes').disabled=!haveNAces(myPid(),need);
-    openDrawer(aceDrawer);
-    aceDrawer.onfocusin = () => {
-  const needNow = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
-  $('aceYes').disabled = !haveNAces(myPid(), needNow);
-};
+  const need = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
+  const aces = myAces();
+  const picker  = $('acePickRow');
+  const choices = $('aceChoices');
+  const help    = $('acePickHelp');
+
+  // Reset selection on open
+  G.acePick = null;
+  $('aceYes').disabled = !haveNAces(myPid(), need);
+
+  // Show picker only if the player has MORE Aces than needed
+  if (aces.length > need){
+    picker.style.display = 'block';
+    choices.innerHTML = '';
+    help.textContent = `Select ${need} Ace${need>1?'s':''} to use`;
+
+    const selected = new Set();
+
+    aces.forEach((c, idx) => {
+      const id  = c.id ?? c._id ?? `A${c.suit}-${idx}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.style.padding = '6px 10px';
+      btn.style.background = 'var(--card)';
+      btn.style.border = '1px solid var(--border)';
+      btn.style.borderRadius = '10px';
+      btn.style.cursor = 'pointer';
+      btn.textContent = `A ${c.suit}`;
+      btn.setAttribute('aria-pressed','false');
+
+      btn.onclick = () => {
+        if (selected.has(id)) {
+          selected.delete(id);
+          btn.style.outline = '';
+          btn.setAttribute('aria-pressed','false');
+        } else {
+          if (selected.size === need) return; // cap at needed
+          selected.add(id);
+          btn.style.outline = `2px solid var(--sel)`;
+          btn.setAttribute('aria-pressed','true');
+        }
+        // Update global pick + enable/disable Block button
+        G.acePick = selected.size === need ? Array.from(selected) : null;
+        $('aceYes').disabled = !G.acePick || G.acePick.length !== need;
+      };
+
+      choices.appendChild(btn);
+    });
+
+  } else {
+    // Exactly enough (or fewer) → no picking UI
+    picker.style.display = 'none';
+    choices.innerHTML = '';
+    help.textContent = '';
+    G.acePick = null;
+    $('aceYes').disabled = !haveNAces(myPid(), need);
   }
+
+  openDrawer(aceDrawer);
+
+  // Keep state fresh if focus changes while open
+  aceDrawer.onfocusin = () => {
+    const needNow = (G.aceQuery && G.aceQuery.kind === 'ASIG') ? 2 : 1;
+    if (G.acePick && G.acePick.length === needNow) {
+      $('aceYes').disabled = false;
+    } else {
+      $('aceYes').disabled = !haveNAces(myPid(), needNow);
+    }
+  };
+}
   function closeAceDrawer(){ closeDrawer(aceDrawer) }
     aceNo.onclick=()=>{ 
     if(!G.aceQuery) return closeAceDrawer(); 
@@ -2588,7 +2688,11 @@ return;
         sendSig({ kind: 'ACE_RESPONSE', use: true });
         return;
       }
-      spendNAces(myPid(), 2);
+      if (G.acePick && G.acePick.length === 2) {
+  spendChosenAces(myPid(), G.acePick);
+} else {
+  spendNAces(myPid(), 2);
+}
       log(`Sigil blocked by 2 Aces → Sigil discarded.`);
       toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
       notePlayerAceBlockSuccess();
@@ -2604,7 +2708,7 @@ return;
   }
 
   // 7/9 roll-block path (needs 1 Ace)
-  if (!haveNAces(myPid(), 1)) { closeAceDrawer(); G.aceQuery = null; return; }
+  if (!haveNAces(myPid(), 1)) { closeAceDrawer(); G.aceQuery = null; G.acePick = null; return; }
 
   if (Pref.mode === 'online' && Pref.role === 'guest') {
     closeAceDrawer();
@@ -2642,10 +2746,14 @@ return;
       if (q.info && q.info.give) { G.players[q.target].hand.push(q.info.give); }
     }
 
-    closeAceDrawer(); G.aceQuery = null; return endTurn();
+    closeAceDrawer(); G.aceQuery = null; G.acePick = null; return endTurn();
   } else {
     // SUCCESS → spend Ace, +1, (for 9: discard the give)
-    spendNAces(myPid(), 1);
+    if (G.acePick && G.acePick.length === 1) {
+  spendChosenAces(myPid(), G.acePick);
+} else {
+  spendNAces(myPid(), 1);
+}
     G.players[myPid()].score += 1;
     bumpScore(myPid());
     if (q.kind === 'A9' && q.info && q.info.give) G.discard.push(q.info.give);
