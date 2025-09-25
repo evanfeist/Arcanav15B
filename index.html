@@ -2535,9 +2535,13 @@ if (kind === 'A9' && info && info.give) G.discard.push(info.give);
 log(`Ace block (d6=${roll}) → BLOCKED +1.`);
 toast(`<div>🛡️ Ace roll <span class='die'>${roll}</span> → block +1</div>`);
 actionBanner('🛡️ Ace Blocked', '+1 point');
+notePlayerAceBlockSuccess();
+believeSawOneAce();
+
+closeAceDrawer();
 G.aceQuery = null;
-endTurn();
-return;
+G.acePick = null;   // <<< ADD THIS LINE
+return endTurn();
     }
   }
 
@@ -2689,18 +2693,24 @@ return;
         return;
       }
       if (G.acePick && G.acePick.length === 2) {
-  spendChosenAces(myPid(), G.acePick);
-} else {
-  spendNAces(myPid(), 2);
-}
+        spendChosenAces(myPid(), G.acePick);
+      } else {
+        spendNAces(myPid(), 2);
+      }
+
       log(`Sigil blocked by 2 Aces → Sigil discarded.`);
       toast(`<div>🛡️ Sigil blocked by 2 Aces</div>`);
       notePlayerAceBlockSuccess();
       believeSawTwoAces();
+
       closeAceDrawer();
       G.aceQuery = null;
+      G.acePick = null;   // clear selection after successful autoblock
       return endTurn();
+
     } else {
+      // Optional tidy-up (in case a selection was made then hand changed)
+      G.acePick = null;
       closeAceDrawer();
       G.aceQuery = null;
       return;
@@ -2785,7 +2795,6 @@ return;
   $('settingsClose').onclick=()=>{closeDrawer(settingsDrawer)};
   $('resetGame').onclick=()=>{localStorage.removeItem(SAVE_KEY);startNew();toast('Game reset.'); if(Net.isOnline()&&Pref.role==='host'){sendSync(1)}};
     // ---- Tutorial wiring (simple) ----
-const TUTO_KEY = 'arcana_tutorial_seen_v1';
 
 function updateTutorialDots(i){
   const dots = $('tutorialDots').querySelectorAll('.dot');
